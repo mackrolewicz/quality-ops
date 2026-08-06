@@ -1,0 +1,65 @@
+# === Java ===
+target/
+*.class
+*.jar
+*.war
+*.ear
+.idea/
+*.iml
+.settings/
+.project
+.classpath
+.factorypath
+
+# === Node ===
+node_modules/
+dist/
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# === General ===
+.env
+*.log
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# === Test output ===
+test-results/
+playwright-report/
+coverage/
+htmlcov/
+.coverage
+.pytest_cache/
+
+# === Docker ===
+docker-compose.override.yml
+
+# === Terraform ===
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+.terraform/
+.terraform.lock.hcl
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# === IDE ===
+.vscode/
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.iml
+
+# === OS ===
+.DS_Store
+Thumbs.db
+Desktop.ini

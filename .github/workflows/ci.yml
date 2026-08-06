@@ -1,0 +1,17 @@
+# CI Pipeline — runs on every PR and push to main
+# Placeholder: will be fully configured when apps are scaffolded
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  placeholder:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "CI pipeline placeholder — configure when apps are scaffolded"

@@ -1,0 +1,36 @@
+spring:
+  application:
+    name: qualityops-gateway
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+  cloud:
+    gateway:
+      routes:
+        - id: api-route
+          uri: ${API_URL:http://localhost:8080}
+          predicates:
+            - Path=/api/**,/auth/**,/actuator/**,/api-docs/**,/swagger-ui/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter:
+                  replenishRate: 50
+                  burstCapacity: 100
+                  requestedTokens: 1
+                key-resolver: "#{@ipKeyResolver}"
+
+server:
+  port: ${SERVER_PORT:8090}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always

@@ -1,0 +1,18 @@
+# Default owner for everything
+* @your-github-username
+
+# Backend
+apps/api/ @your-github-username
+apps/worker/ @your-github-username
+apps/gateway/ @your-github-username
+
+# Frontend
+apps/web/ @your-github-username
+
+# Infrastructure
+infra/ @your-github-username
+.github/ @your-github-username
+
+# Architecture docs — require review for changes
+ARCHITECTURE.md @your-github-username
+docs/architecture/ @your-github-username

@@ -1,0 +1,62 @@
+# Dev overlay — builds and adds the API and Gateway services from source.
+#
+# Run from the REPOSITORY ROOT (not infra/compose):
+#   docker compose -f infra/compose/docker-compose.yml \
+#                  -f infra/compose/docker-compose.dev.yml up -d --build
+#
+# The build context is set to the repo root so the Maven parent pom resolves.
+
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.api
+    ports:
+      - "8080:8080"
+    environment:
+      # Matches the ${DB_URL}, ${DB_USER}, ${DB_PASSWORD} placeholders in application.yml
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-qualityops}
+      DB_USER: ${POSTGRES_USER:-qualityops}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-qualityops}
+      REDIS_HOST: redis
+      KAFKA_SERVERS: kafka:9092
+      JWT_SECRET: ${JWT_SECRET:-ZGV2LXNlY3JldC1jaGFuZ2UtaW4tcHJvZHVjdGlvbi1tdXN0LWJlLWF0LWxlYXN0LTI1Ni1iaXRz}
+      SERVER_PORT: "8080"
+      SPRING_PROFILES_ACTIVE: local
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+  gateway:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.gateway
+    ports:
+      - "8090:8090"
+    environment:
+      # Matches the ${API_URL}, ${REDIS_HOST} placeholders in application.yml
+      API_URL: http://api:8080
+      REDIS_HOST: redis
+      SERVER_PORT: "8090"
+      SPRING_PROFILES_ACTIVE: local
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    depends_on:
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy

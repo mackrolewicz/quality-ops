@@ -1,0 +1,35 @@
+# ── Build stage ────────────────────────────────────────────────────────────────
+# No Maven wrapper in this repo; use a pinned Maven + JDK 21 builder image.
+# Build context must be the repository root so the parent pom.xml resolves.
+FROM maven:3.9.9-eclipse-temurin-21-alpine AS build
+WORKDIR /workspace
+
+# Copy POMs before source to exploit Docker layer caching:
+# dependency downloads are re-used as long as pom files are unchanged.
+COPY pom.xml               ./
+COPY apps/api/pom.xml      apps/api/
+COPY apps/gateway/pom.xml  apps/gateway/
+RUN mvn -B -pl apps/api dependency:go-offline -q
+
+# Copy source and produce the executable fat JAR.
+COPY apps/api/src apps/api/src
+RUN mvn -B -pl apps/api package -DskipTests -q
+
+# ── Runtime stage ──────────────────────────────────────────────────────────────
+FROM eclipse-temurin:21-jre-alpine AS runtime
+WORKDIR /app
+
+# Install curl for the HEALTHCHECK, then create a dedicated non-root user.
+RUN apk add --no-cache curl \
+    && addgroup --system app \
+    && adduser --system --ingroup app app
+
+COPY --from=build /workspace/apps/api/target/*.jar app.jar
+
+USER app
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=5 \
+  CMD curl -f http://localhost:8080/actuator/health || exit 1
+
+ENTRYPOINT ["java", "-jar", "app.jar"]

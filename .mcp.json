@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "cmd",
+      "args": ["/c", "npx", "@playwright/mcp@latest"]
+    },
+    "stitch": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@google/stitch-mcp@latest"],
+      "env": {
+        "STITCH_API_TOKEN": "${STITCH_API_TOKEN}"
+      }
+    }
+  }
+}
