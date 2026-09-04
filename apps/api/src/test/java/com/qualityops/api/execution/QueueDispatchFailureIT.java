@@ -21,7 +21,8 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 /**
  * B1 (ADR-006 amendment §3): when the dispatcher abandons a claim — corrupt
@@ -113,7 +114,14 @@ class QueueDispatchFailureIT extends AbstractPostgresIT {
         assertThat(queueState(runId)).isEqualTo("FAILED");
         assertThat(runStatus(runId)).isEqualTo("FAILED");
         assertThat(frozenEventIsNull(runId)).isTrue();
-        verifyNoInteractions(publisher);
+        // dispatchAvailable() scans run_queue globally, not just this test's own
+        // row — in the full apps/api IT suite it may legitimately also dispatch
+        // an unrelated QUEUED row left behind by another class's test (every IT
+        // in this module shares one Postgres Testcontainers instance). The
+        // assertion that matters is that THIS test's corrupted-event run was
+        // never published, not that the mock saw zero interactions at all.
+        verify(publisher, never()).publishRunRequested(
+            ArgumentMatchers.argThat(e -> e.runId().equals(runId)));
     }
 
     @Test

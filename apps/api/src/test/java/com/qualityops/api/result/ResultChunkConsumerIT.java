@@ -54,13 +54,20 @@ class ResultChunkConsumerIT extends AbstractKafkaPostgresIT {
         runId = runRepository.save(run).id();
     }
 
+    // Timeouts here are generous (60s / during 5s-atMost 30s) rather than tight:
+    // this class shares one embedded/Testcontainers Kafka broker with every
+    // other apps/api IT, and observed delivery latency for these chunks grows
+    // materially when running as part of the full IT suite (hundreds of prior
+    // classes' topics/consumer groups on the same broker) versus in isolation.
+    // A 20s/9s margin that was comfortable running this class alone flaked
+    // reproducibly (not randomly) when the whole apps/api verify ran together.
     @Test
     void duplicateChunk_yieldsExactlyOneResultRow() {
         var chunk = chunk(0, CaseResultSummary.Verdict.PASSED, List.of());
         kafkaTemplate.send(CHUNK, runId.toString(), chunk);
         kafkaTemplate.send(CHUNK, runId.toString(), chunk);
 
-        await().atMost(20, SECONDS).untilAsserted(() ->
+        await().atMost(60, SECONDS).untilAsserted(() ->
             assertThat(resultRows()).isEqualTo(1L));
         assertThat(resultStatus()).isEqualTo("PASSED");
     }
@@ -69,12 +76,12 @@ class ResultChunkConsumerIT extends AbstractKafkaPostgresIT {
     void lowerEpochAfterHigher_doesNotOverwriteResultOrArtifacts() {
         kafkaTemplate.send(CHUNK, runId.toString(), chunk(1, CaseResultSummary.Verdict.PASSED,
             List.of(ref(ArtifactType.SCREENSHOT, key(1)))));
-        await().atMost(20, SECONDS).untilAsserted(() -> assertThat(attemptEpoch()).isEqualTo(1));
+        await().atMost(60, SECONDS).untilAsserted(() -> assertThat(attemptEpoch()).isEqualTo(1));
 
         kafkaTemplate.send(CHUNK, runId.toString(), chunk(0, CaseResultSummary.Verdict.FAILED,
             List.of(ref(ArtifactType.SCREENSHOT, key(0)))));
 
-        await().during(3, SECONDS).atMost(9, SECONDS).untilAsserted(() -> {
+        await().during(5, SECONDS).atMost(30, SECONDS).untilAsserted(() -> {
             assertThat(attemptEpoch()).isEqualTo(1);
             assertThat(resultStatus()).isEqualTo("PASSED");
             assertThat(artifactKeys()).containsExactly(key(1));
@@ -88,7 +95,7 @@ class ResultChunkConsumerIT extends AbstractKafkaPostgresIT {
             new ArtifactReference(ArtifactType.TRACE, null, null, null,
                 ArtifactReference.Availability.UNAVAILABLE, "store-unreachable"))));
 
-        await().atMost(20, SECONDS).untilAsserted(() ->
+        await().atMost(60, SECONDS).untilAsserted(() ->
             assertThat(artifactRows()).isEqualTo(2L));
     }
 
@@ -100,7 +107,7 @@ class ResultChunkConsumerIT extends AbstractKafkaPostgresIT {
             caseId, 0, CaseResultSummary.Verdict.PASSED, 10L, null, List.of());
         kafkaTemplate.send(CHUNK, runId.toString(), event);
 
-        await().during(3, SECONDS).atMost(9, SECONDS).untilAsserted(() ->
+        await().during(5, SECONDS).atMost(30, SECONDS).untilAsserted(() ->
             assertThat(rawResultRows()).isZero());
     }
 
@@ -111,7 +118,7 @@ class ResultChunkConsumerIT extends AbstractKafkaPostgresIT {
             caseId, 0, CaseResultSummary.Verdict.PASSED, 10L, null, List.of());
         kafkaTemplate.send(CHUNK, runId.toString(), event);
 
-        await().during(3, SECONDS).atMost(9, SECONDS).untilAsserted(() ->
+        await().during(5, SECONDS).atMost(30, SECONDS).untilAsserted(() ->
             assertThat(rawResultRows()).isZero());
     }
 

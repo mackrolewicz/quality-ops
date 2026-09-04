@@ -102,7 +102,17 @@ public class RunService implements TriggerRunUseCase, ListRunsUseCase, GetRunUse
         return row == null ? null : RepositoryRunResponse.from(row);
     }
 
+    // noRollbackFor: a "not found" lookup is normal control flow for every
+    // caller that catches RunNotFoundException (e.g. ResultService.guardRun) -
+    // without this, the class-level @Transactional default marks the CALLER's
+    // enclosing (joined, REQUIRED-propagation) transaction rollback-only the
+    // moment this method throws, even though the caller's own catch block
+    // never sees that the transaction is already doomed. On a Kafka listener
+    // this silently discards the whole message (UnexpectedRollbackException on
+    // commit) and, on a single-partition topic with no retry ceiling, blocks
+    // every later message behind it forever.
     @Override
+    @Transactional(readOnly = true, noRollbackFor = RunNotFoundException.class)
     public TestRun getDomain(UUID id, UUID orgId) {
         return runRepository.findByIdAndOrgId(id, orgId)
             .orElseThrow(() -> new RunNotFoundException("Run not found: " + id));
