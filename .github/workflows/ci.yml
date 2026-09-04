@@ -126,7 +126,7 @@ jobs:
           docker build -f infra/docker/Dockerfile.worker  -t qualityops/worker:scan  .
           docker build -f infra/docker/Dockerfile.gateway -t qualityops/gateway:scan .
       - name: Trivy image scan — api (fail on HIGH/CRITICAL)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           scan-type: image
           image-ref: qualityops/api:scan
@@ -138,7 +138,7 @@ jobs:
           output: sarif-results/trivy-api.sarif
           limit-severities-for-sarif: true
       - name: Trivy image scan — worker
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           scan-type: image
           image-ref: qualityops/worker:scan
@@ -150,7 +150,7 @@ jobs:
           output: sarif-results/trivy-worker.sarif
           limit-severities-for-sarif: true
       - name: Trivy image scan — gateway
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           scan-type: image
           image-ref: qualityops/gateway:scan
@@ -196,7 +196,7 @@ jobs:
           echo "ref=${!IMAGE_VAR}" >> "$GITHUB_OUTPUT"
       - run: mkdir -p sarif-results
       - name: Trivy image scan (fail on HIGH/CRITICAL)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           scan-type: image
           image-ref: ${{ steps.image.outputs.ref }}
