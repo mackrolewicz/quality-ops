@@ -485,7 +485,12 @@ public class DockerContainerRunner implements ContainerRunnerPort {
      *  sees a possibly-stale total on this poll and retries next interval. */
     static long workspaceSizeBytes(Path dir) {
         try (Stream<Path> walk = Files.walk(dir)) {
-            return walk.mapToLong(p -> p.toFile().length()).sum();
+            // Regular files only — File.length() on a directory is filesystem-
+            // dependent (0 on NTFS, typically a 4096-byte inode block on ext4),
+            // so including directory entries silently inflates the total on
+            // Linux and would trip the quota watchdog on workspaces that are
+            // merely directory-heavy rather than actually large.
+            return walk.filter(Files::isRegularFile).mapToLong(p -> p.toFile().length()).sum();
         } catch (IOException | java.io.UncheckedIOException e) {
             return 0L;
         }
