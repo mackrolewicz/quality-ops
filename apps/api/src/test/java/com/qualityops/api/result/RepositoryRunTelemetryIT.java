@@ -115,4 +115,45 @@ class RepositoryRunTelemetryIT extends AbstractPostgresIT {
             "SELECT runner_image_digest FROM repository_run WHERE run_id = ?", String.class, runId)).isNull();
         assertThat(state()).isEqualTo("PENDING");
     }
+
+    @Test
+    void chunkProvenance_setsErrorDetailFromTheCaseFailureReason() {
+        results.recordChunk(new ResultChunkEvent(UUID.randomUUID(), UUID.randomUUID(), orgId, runId,
+            executionId, Instant.now(), ResultChunkEvent.SCHEMA_VERSION, caseId, 0,
+            CaseResultSummary.Verdict.FAILED, 42L, "2 of 3 tests failed; exit 1", List.of(), List.of(),
+            provenance()));
+
+        assertThat(jdbc.queryForObject(
+            "SELECT error_detail FROM repository_run WHERE run_id = ?", String.class, runId))
+            .isEqualTo("2 of 3 tests failed; exit 1");
+    }
+
+    /** V26 (reviewer Fix 4) — repository_run.attempt_epoch mirrors the
+     *  repository_test_item epoch guard: a stale/redelivered chunk at a LOWER
+     *  epoch than what is already persisted must never regress provenance
+     *  written by a later attempt. */
+    @Test
+    void staleAttemptEpoch_neverRegressesNewerProvenance() {
+        results.recordChunk(new ResultChunkEvent(UUID.randomUUID(), UUID.randomUUID(), orgId, runId,
+            executionId, Instant.now(), ResultChunkEvent.SCHEMA_VERSION, caseId, 1,
+            CaseResultSummary.Verdict.FAILED, 42L, "attempt 2 failure", List.of(), List.of(),
+            new RepositoryRunProvenance("sha256:epoch1", 1, 5, 4, 1, 0,
+                Instant.now(), Instant.now(), Instant.now())));
+
+        // A redelivered epoch-0 chunk (the earlier attempt) arriving after the
+        // later attempt's chunk must be a no-op, not an overwrite.
+        results.recordChunk(new ResultChunkEvent(UUID.randomUUID(), UUID.randomUUID(), orgId, runId,
+            executionId, Instant.now(), ResultChunkEvent.SCHEMA_VERSION, caseId, 0,
+            CaseResultSummary.Verdict.FAILED, 42L, "attempt 1 failure (stale)", List.of(), List.of(),
+            new RepositoryRunProvenance("sha256:epoch0-stale", 137, 1, 0, 1, 0,
+                Instant.now(), Instant.now(), Instant.now())));
+
+        Map<String, Object> row = jdbc.queryForMap(
+            "SELECT runner_image_digest, container_exit_code, error_detail, attempt_epoch "
+                + "FROM repository_run WHERE run_id = ?", runId);
+        assertThat(row.get("runner_image_digest")).isEqualTo("sha256:epoch1");
+        assertThat(row.get("container_exit_code")).isEqualTo(1);
+        assertThat(row.get("error_detail")).isEqualTo("attempt 2 failure");
+        assertThat(((Number) row.get("attempt_epoch")).intValue()).isEqualTo(1);
+    }
 }

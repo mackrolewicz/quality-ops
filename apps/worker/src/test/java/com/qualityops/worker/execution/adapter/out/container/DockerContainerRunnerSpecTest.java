@@ -1,6 +1,7 @@
 package com.qualityops.worker.execution.adapter.out.container;
 
 import com.github.dockerjava.api.DockerClient;
+import com.github.dockerjava.api.model.AccessMode;
 import com.github.dockerjava.api.model.Bind;
 import com.github.dockerjava.api.model.Capability;
 import com.github.dockerjava.api.model.HostConfig;
@@ -67,7 +68,10 @@ class DockerContainerRunnerSpecTest {
         assertThat(hc.getCapDrop()).containsExactly(Capability.ALL);
         assertThat(hc.getCapAdd()).isNullOrEmpty();
         assertThat(hc.getReadonlyRootfs()).isTrue();
-        assertThat(hc.getSecurityOpts()).contains("no-new-privileges:true");
+        // "seccomp=default" is not a valid Docker value (only a JSON profile
+        // path or "unconfined" are) — Docker applies its own default profile
+        // with no explicit seccomp flag at all.
+        assertThat(hc.getSecurityOpts()).containsExactly("no-new-privileges:true");
         assertThat(hc.getMemory()).isEqualTo(MEM);
         assertThat(hc.getMemorySwap()).isEqualTo(MEM);
         assertThat(hc.getNanoCPUs()).isEqualTo(NANO_CPUS);
@@ -87,6 +91,28 @@ class DockerContainerRunnerSpecTest {
         assertThat(binds).hasSize(1);
         assertThat(binds[0].getVolume().getPath()).isEqualTo("/workspace");
         assertThat(binds[0].getPath()).doesNotContain("docker.sock").doesNotContain("docker_engine");
+    }
+
+    @Test
+    void buildHostConfig_withSecretBinds_addsThemReadOnlyAlongsideTheWorkspace() {
+        var spec = new ContainerRunSpec(UUID.fromString("11111111-1111-1111-1111-111111111111"), 0,
+            "checkout", "py@sha256:x", List.of("sh", "-c"), List.of("true"), "/workspace", Map.of(),
+            Path.of("/var/run/qo/ws/exec/0"), new ResourceLimits(MEM, NANO_CPUS, 512, TMPFS, WORKSPACE, 4096, 8192),
+            NetworkMode.EGRESS, Duration.ofMinutes(5), Map.of("com.qualityops.run.id", "run-1"),
+            Map.of(Path.of("/host/secrets/checkout-token"), "/run/secrets/checkout-token"));
+
+        Bind[] binds = runner.buildHostConfig(spec, false).getBinds();
+
+        assertThat(binds).hasSize(2);
+        assertThat(binds).anySatisfy(b -> {
+            assertThat(b.getVolume().getPath()).isEqualTo("/workspace");
+            assertThat(b.getAccessMode()).isNotEqualTo(AccessMode.ro);
+        });
+        assertThat(binds).anySatisfy(b -> {
+            assertThat(b.getVolume().getPath()).isEqualTo("/run/secrets/checkout-token");
+            assertThat(b.getPath()).contains("checkout-token");
+            assertThat(b.getAccessMode()).isEqualTo(AccessMode.ro);
+        });
     }
 
     @Test
@@ -120,5 +146,43 @@ class DockerContainerRunnerSpecTest {
     @Test
     void user_isTheNonRootRunnerUidGid() {
         assertThat(runner.user()).isEqualTo("12000:12000");
+    }
+
+    // --- workspace watchdog (ADR-009 §6/§9 Risks — disk bound of record) ---
+
+    @Test
+    void exceedsQuota_sizeUnderLimit_isFalse() {
+        assertThat(DockerContainerRunner.exceedsQuota(1_000L, 2_000L)).isFalse();
+    }
+
+    @Test
+    void exceedsQuota_sizeOverLimit_isTrue() {
+        assertThat(DockerContainerRunner.exceedsQuota(2_001L, 2_000L)).isTrue();
+    }
+
+    @Test
+    void exceedsQuota_sizeEqualToLimit_isFalse() {
+        assertThat(DockerContainerRunner.exceedsQuota(2_000L, 2_000L)).isFalse();
+    }
+
+    @Test
+    void exceedsQuota_noBoundConfigured_neverExceeds() {
+        assertThat(DockerContainerRunner.exceedsQuota(Long.MAX_VALUE, 0L)).isFalse();
+        assertThat(DockerContainerRunner.exceedsQuota(Long.MAX_VALUE, -1L)).isFalse();
+    }
+
+    @Test
+    void workspaceSizeBytes_sumsAllFilesRecursively(@org.junit.jupiter.api.io.TempDir Path tempDir)
+            throws java.io.IOException {
+        java.nio.file.Files.writeString(tempDir.resolve("a.txt"), "12345"); // 5 bytes
+        var sub = java.nio.file.Files.createDirectory(tempDir.resolve("sub"));
+        java.nio.file.Files.writeString(sub.resolve("b.txt"), "1234567890"); // 10 bytes
+
+        assertThat(DockerContainerRunner.workspaceSizeBytes(tempDir)).isEqualTo(15L);
+    }
+
+    @Test
+    void workspaceSizeBytes_nonExistentDir_returnsZero_notThrows() {
+        assertThat(DockerContainerRunner.workspaceSizeBytes(Path.of("/does/not/exist/qo-ws"))).isZero();
     }
 }

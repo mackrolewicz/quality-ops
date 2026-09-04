@@ -9,6 +9,7 @@ import com.github.dockerjava.api.exception.ConflictException;
 import com.github.dockerjava.api.exception.DockerClientException;
 import com.github.dockerjava.api.exception.DockerException;
 import com.github.dockerjava.api.exception.NotFoundException;
+import com.github.dockerjava.api.model.AccessMode;
 import com.github.dockerjava.api.model.Bind;
 import com.github.dockerjava.api.model.Capability;
 import com.github.dockerjava.api.model.Container;
@@ -32,6 +33,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Comparator;
@@ -109,6 +111,8 @@ public class DockerContainerRunner implements ContainerRunnerPort {
         Instant startedAt = Instant.now();
         docker.startContainerCmd(id).exec();
         var watcher = startCancelWatcher(id, cancel);
+        var workspaceWatchdog = startWorkspaceWatchdog(id, name, spec.workspaceHostDir(),
+            spec.limits().workspaceBytes(), props.container() == null ? null : props.container().workspaceWatchdog());
 
         boolean timedOut = false;
         try {
@@ -122,6 +126,7 @@ public class DockerContainerRunner implements ContainerRunnerPort {
             killQuietly(id, "SIGKILL");
         } finally {
             watcher.interrupt();
+            workspaceWatchdog.interrupt();
         }
         // One-shot log fetch after the container has stopped — robust across
         // daemon transports (a follow-stream can wedge the httpclient5 connection
@@ -260,10 +265,20 @@ public class DockerContainerRunner implements ContainerRunnerPort {
 
     HostConfig buildHostConfig(ContainerRunSpec spec, boolean withStorageOpt) {
         ResourceLimits lim = spec.limits();
+        var binds = new java.util.ArrayList<Bind>();
+        binds.add(new Bind(spec.workspaceHostDir().toAbsolutePath().toString(), new Volume(WORKSPACE_MOUNT)));
+        if (spec.secretBinds() != null) {
+            spec.secretBinds().forEach((hostPath, containerPath) ->
+                binds.add(new Bind(hostPath.toAbsolutePath().toString(), new Volume(containerPath), AccessMode.ro)));
+        }
         HostConfig hc = HostConfig.newHostConfig()
             .withCapDrop(Capability.ALL)
             .withReadonlyRootfs(true)
-            .withSecurityOpts(List.of("no-new-privileges:true", "seccomp=default"))
+            // Docker applies its own default seccomp profile with no explicit
+            // --security-opt seccomp= flag at all; "seccomp=default" is NOT a
+            // valid value (only a JSON profile path or "unconfined" are) and
+            // would fail container-create on a daemon that validates it strictly.
+            .withSecurityOpts(List.of("no-new-privileges:true"))
             .withMemory(lim.memoryBytes())
             .withMemorySwap(lim.memoryBytes()) // == Memory ⇒ swap disabled
             .withNanoCPUs(lim.nanoCpus())
@@ -272,8 +287,7 @@ public class DockerContainerRunner implements ContainerRunnerPort {
             .withNetworkMode(networkMode(spec.network()))
             .withTmpFs(Map.of("/tmp", "rw,noexec,nosuid,size=" + Math.max(1, lim.tmpfsBytes() >> 20) + "m"))
             .withUlimits(new Ulimit[]{new Ulimit("nofile", lim.nofileSoft(), lim.nofileHard())})
-            .withBinds(new Bind(spec.workspaceHostDir().toAbsolutePath().toString(),
-                new Volume(WORKSPACE_MOUNT)));
+            .withBinds(binds);
         if (withStorageOpt && lim.workspaceBytes() > 0) {
             hc.withStorageOpt(Map.of("size", (Math.max(1, lim.workspaceBytes() >> 20)) + "m"));
         }
@@ -426,6 +440,57 @@ public class DockerContainerRunner implements ContainerRunnerPort {
         return t;
     }
 
+    // --- workspace watchdog ---
+
+    /** ADR-009 §6/§9 Risks — {@code withStorageOpt} is best-effort (overlay2
+     *  without xfs-pquota rejects or ignores it); this watchdog is the disk
+     *  bound of record when it is unsupported. Polls the bind-mounted
+     *  workspace's total size and SIGKILLs the container the first time it
+     *  exceeds {@code workspaceBytes}. Best-effort: a transient stat failure
+     *  mid-write (a file being written/removed concurrently) is swallowed, not
+     *  fatal — the next poll retries. */
+    private Thread startWorkspaceWatchdog(String id, String name, Path workspaceHostDir, long workspaceBytes,
+                                          Duration configuredInterval) {
+        Duration interval = configuredInterval == null || configuredInterval.isZero() || configuredInterval.isNegative()
+            ? Duration.ofSeconds(5) : configuredInterval;
+        Thread t = new Thread(() -> {
+            try {
+                while (!Thread.currentThread().isInterrupted()) {
+                    Thread.sleep(interval.toMillis());
+                    long size = workspaceSizeBytes(workspaceHostDir);
+                    if (exceedsQuota(size, workspaceBytes)) {
+                        log.warn("container {} workspace {} exceeded {} bytes ({} used) — SIGKILL",
+                            name, workspaceHostDir, workspaceBytes, size);
+                        metrics.containerKill("workspace_quota");
+                        killQuietly(id, "SIGKILL");
+                        return;
+                    }
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }, "repo-workspace-watchdog-" + id.substring(0, Math.min(12, id.length())));
+        t.setDaemon(true);
+        t.start();
+        return t;
+    }
+
+    /** {@code workspaceBytes <= 0} means no bound is configured — never kill. */
+    static boolean exceedsQuota(long sizeBytes, long workspaceBytes) {
+        return workspaceBytes > 0 && sizeBytes > workspaceBytes;
+    }
+
+    /** Best-effort — an {@link IOException} mid-walk (a file removed/rewritten
+     *  concurrently by the running container) is not fatal; the caller simply
+     *  sees a possibly-stale total on this poll and retries next interval. */
+    static long workspaceSizeBytes(Path dir) {
+        try (Stream<Path> walk = Files.walk(dir)) {
+            return walk.mapToLong(p -> p.toFile().length()).sum();
+        } catch (IOException | java.io.UncheckedIOException e) {
+            return 0L;
+        }
+    }
+
     // --- helpers ---
 
     private java.util.OptionalInt inspectExitCode(String id) {
@@ -481,6 +546,22 @@ public class DockerContainerRunner implements ContainerRunnerPort {
             Files.createDirectories(workspaceHostDir);
         } catch (IOException e) {
             throw new ContainerRunException("could not create workspace dir " + workspaceHostDir, e);
+        }
+        // The Worker process is not root and cannot chown this directory to an
+        // arbitrary container uid (container.runner-uid, default 12000) — there
+        // is no "chown to whatever uid the image happens to run as" available
+        // without root. World-writable is the correct, safe substitute here:
+        // this is a fresh, empty, execution-scoped scratch directory that is
+        // deleted immediately after the attempt (never anything sensitive), so
+        // functionally it achieves the same outcome (the container's non-root
+        // user can write into it) without requiring elevated Worker privileges.
+        try {
+            Files.setPosixFilePermissions(workspaceHostDir, PosixFilePermissions.fromString("rwxrwxrwx"));
+        } catch (UnsupportedOperationException e) {
+            // Windows (and any non-POSIX filesystem) — nothing to do; this box
+            // never runs real containers against this path anyway.
+        } catch (IOException e) {
+            log.debug("could not set workspace dir permissions for {}: {}", workspaceHostDir, e.toString());
         }
     }
 

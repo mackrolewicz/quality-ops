@@ -24,9 +24,11 @@ public interface RepositoryRunWriteUseCase {
     void markState(UUID runId, UUID orgId, UUID executionId, RepositoryRunState state);
 
     /** Apply container/report telemetry (digest, exit code, item counts,
-     *  checkout/started/finished timestamps) from a {@code results.chunk} or the
-     *  v5 terminal, org- + executionId-guarded. Timestamps are COALESCEd so an
-     *  earlier chunk's values are not clobbered. */
-    void applyProvenance(UUID runId, UUID orgId, UUID executionId,
-                         RepositoryRunProvenance provenance, int attemptEpoch);
+     *  checkout/started/finished timestamps, a redacted failure summary) from a
+     *  {@code results.chunk} or the v5 terminal, org- + executionId-guarded and
+     *  epoch-monotone (a stale/redelivered {@code attemptEpoch} is a no-op).
+     *  Timestamps are COALESCEd so an earlier chunk's values are not clobbered.
+     *  {@code errorDetail} is null for a clean pass. */
+    void applyProvenance(UUID runId, UUID orgId, UUID executionId, RepositoryRunProvenance provenance,
+                         int attemptEpoch, String errorDetail);
 }

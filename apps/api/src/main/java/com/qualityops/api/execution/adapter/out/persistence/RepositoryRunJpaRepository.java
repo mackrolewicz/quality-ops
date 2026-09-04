@@ -59,7 +59,10 @@ interface RepositoryRunJpaRepository extends JpaRepository<RepositoryRunEntity, 
 
     // Telemetry: counts/digest/exit — new value wins when non-null; checkout/started
     // timestamps are keep-first; finished — new wins when non-null. Skipped for a
-    // CANCELLED row; org- + executionId-guarded.
+    // CANCELLED row; org- + executionId-guarded; epoch-monotone (mirrors
+    // repository_test_item's upsert guard, V25/V26) — a stale/redelivered
+    // results.chunk (attempt_epoch <= the persisted value) is a 0-row no-op and
+    // never regresses provenance already written by a later attempt.
     @Modifying
     @Query(value = """
         UPDATE repository_run rr SET
@@ -71,8 +74,11 @@ interface RepositoryRunJpaRepository extends JpaRepository<RepositoryRunEntity, 
             items_skipped = COALESCE(CAST(:itemsSkipped AS integer), rr.items_skipped),
             checkout_at = COALESCE(rr.checkout_at, CAST(:checkoutAt AS timestamptz)),
             started_at  = COALESCE(rr.started_at,  CAST(:startedAt AS timestamptz)),
-            finished_at = COALESCE(CAST(:finishedAt AS timestamptz), rr.finished_at)
+            finished_at = COALESCE(CAST(:finishedAt AS timestamptz), rr.finished_at),
+            error_detail = COALESCE(CAST(:errorDetail AS varchar), rr.error_detail),
+            attempt_epoch = :epoch
         WHERE rr.run_id = :runId AND rr.org_id = :orgId AND rr.state <> 'CANCELLED'
+          AND rr.attempt_epoch <= :epoch
           AND EXISTS (SELECT 1 FROM test_runs t
                       WHERE t.id = rr.run_id AND t.org_id = rr.org_id AND t.execution_id = :executionId)
         """, nativeQuery = true)
@@ -82,5 +88,6 @@ interface RepositoryRunJpaRepository extends JpaRepository<RepositoryRunEntity, 
                        @Param("itemsTotal") Integer itemsTotal, @Param("itemsPassed") Integer itemsPassed,
                        @Param("itemsFailed") Integer itemsFailed, @Param("itemsSkipped") Integer itemsSkipped,
                        @Param("checkoutAt") Instant checkoutAt, @Param("startedAt") Instant startedAt,
-                       @Param("finishedAt") Instant finishedAt);
+                       @Param("finishedAt") Instant finishedAt, @Param("errorDetail") String errorDetail,
+                       @Param("epoch") int epoch);
 }

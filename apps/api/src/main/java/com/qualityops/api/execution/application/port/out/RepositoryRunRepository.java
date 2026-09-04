@@ -26,11 +26,13 @@ public interface RepositoryRunRepository {
     int transitionState(UUID runId, UUID orgId, UUID executionId,
                         List<RepositoryRunState> fromStates, RepositoryRunState toState);
 
-    /** Guarded telemetry apply (COALESCE timestamps); skipped for a CANCELLED row.
+    /** Guarded telemetry apply (COALESCE timestamps); skipped for a CANCELLED row;
+     *  epoch-monotone — a stale/redelivered {@code attemptEpoch} is a 0-row no-op.
      *  @return rows affected. */
     int applyTelemetry(UUID runId, UUID orgId, UUID executionId, String imageDigest, Integer exitCode,
                        Integer itemsTotal, Integer itemsPassed, Integer itemsFailed, Integer itemsSkipped,
-                       Instant checkoutAt, Instant startedAt, Instant finishedAt);
+                       Instant checkoutAt, Instant startedAt, Instant finishedAt, String errorDetail,
+                       int attemptEpoch);
 
     Optional<RepositoryRunRow> findByRunIdAndOrgId(UUID runId, UUID orgId);
 

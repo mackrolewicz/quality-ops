@@ -110,7 +110,7 @@ public class ResultService implements ListResultsUseCase, GetAnalyticsUseCase,
         if (event.caseResults() != null) {
             for (CaseResultSummary cr : event.caseResults()) {
                 applyRepositoryPayload(event.orgId(), event.runId(), event.executionId(),
-                    cr.attemptEpoch(), cr.repositoryItems(), cr.repositoryProvenance());
+                    cr.attemptEpoch(), cr.repositoryItems(), cr.repositoryProvenance(), cr.firstFailureReason());
             }
         }
 
@@ -129,7 +129,8 @@ public class ResultService implements ListResultsUseCase, GetAnalyticsUseCase,
             event.firstFailureReason(), event.attemptEpoch(), event.artifacts()));
 
         applyRepositoryPayload(event.orgId(), event.runId(), event.executionId(),
-            event.attemptEpoch(), event.repositoryItems(), event.repositoryProvenance());
+            event.attemptEpoch(), event.repositoryItems(), event.repositoryProvenance(),
+            event.firstFailureReason());
 
         log.debug("Recorded result chunk for run {} case {} epoch {}",
             event.runId(), event.testCaseId(), event.attemptEpoch());
@@ -175,16 +176,19 @@ public class ResultService implements ListResultsUseCase, GetAnalyticsUseCase,
 
     /** ADR-009 §7 — repository run's per-test breakdown + run-level telemetry.
      *  Both are org- + executionId-guarded and epoch-monotone; a stale event is a
-     *  0-row no-op. Called from the chunk and the terminal. */
+     *  0-row no-op. Called from the chunk and the terminal. {@code errorDetail}
+     *  is the case's (redacted, worker-side) failure reason — null for a clean
+     *  pass — persisted onto {@code repository_run.error_detail}. */
     private void applyRepositoryPayload(UUID orgId, UUID runId, UUID executionId, int attemptEpoch,
                                         List<com.qualityops.events.RepositoryTestItem> items,
-                                        RepositoryRunProvenance provenance) {
+                                        RepositoryRunProvenance provenance, String errorDetail) {
         if (items != null && !items.isEmpty()) {
             repositoryTestItemRepository.upsertForRun(orgId, runId, attemptEpoch,
                 toDomainItems(items, attemptEpoch));
         }
         if (provenance != null) {
-            repositoryRunWriteUseCase.applyProvenance(runId, orgId, executionId, provenance, attemptEpoch);
+            repositoryRunWriteUseCase.applyProvenance(runId, orgId, executionId, provenance, attemptEpoch,
+                errorDetail);
         }
     }
 

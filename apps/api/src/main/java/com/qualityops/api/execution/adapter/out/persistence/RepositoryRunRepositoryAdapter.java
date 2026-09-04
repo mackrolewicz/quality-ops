@@ -45,13 +45,23 @@ class RepositoryRunRepositoryAdapter implements RepositoryRunRepository {
             fromStates.stream().map(Enum::name).toList(), toState.name());
     }
 
+    private static final int MAX_ERROR_DETAIL_CHARS = 1000; // matches repository_run.error_detail VARCHAR(1000)
+
     @Override
     @Transactional
     public int applyTelemetry(UUID runId, UUID orgId, UUID executionId, String imageDigest, Integer exitCode,
                               Integer itemsTotal, Integer itemsPassed, Integer itemsFailed,
-                              Integer itemsSkipped, Instant checkoutAt, Instant startedAt, Instant finishedAt) {
+                              Integer itemsSkipped, Instant checkoutAt, Instant startedAt, Instant finishedAt,
+                              String errorDetail, int attemptEpoch) {
         return jpa.applyTelemetry(runId, orgId, executionId, imageDigest, exitCode, itemsTotal, itemsPassed,
-            itemsFailed, itemsSkipped, checkoutAt, startedAt, finishedAt);
+            itemsFailed, itemsSkipped, checkoutAt, startedAt, finishedAt, truncate(errorDetail), attemptEpoch);
+    }
+
+    private static String truncate(String errorDetail) {
+        if (errorDetail == null || errorDetail.length() <= MAX_ERROR_DETAIL_CHARS) {
+            return errorDetail;
+        }
+        return errorDetail.substring(0, MAX_ERROR_DETAIL_CHARS);
     }
 
     @Override

@@ -119,7 +119,8 @@ class ResultServiceRepoTest {
         var prov = provenance();
         service.recordChunk(chunk(List.of(), prov));
 
-        verify(repositoryRunWriteUseCase).applyProvenance(runId, orgId, executionId, prov, 1);
+        verify(repositoryRunWriteUseCase).applyProvenance(runId, orgId, executionId, prov, 1,
+            "3 of 3 tests, 1 failed");
     }
 
     @Test
@@ -127,7 +128,7 @@ class ResultServiceRepoTest {
         service.recordChunk(chunk(List.of(), null));
 
         verify(repositoryTestItemRepository, never()).upsertForRun(any(), any(), anyInt(), any());
-        verify(repositoryRunWriteUseCase, never()).applyProvenance(any(), any(), any(), any(), anyInt());
+        verify(repositoryRunWriteUseCase, never()).applyProvenance(any(), any(), any(), any(), anyInt(), any());
     }
 
     @Test
@@ -144,6 +145,6 @@ class ResultServiceRepoTest {
         service.generateResults(terminal);
 
         verify(repositoryTestItemRepository).upsertForRun(eq(orgId), eq(runId), eq(2), any());
-        verify(repositoryRunWriteUseCase).applyProvenance(runId, orgId, executionId, prov, 2);
+        verify(repositoryRunWriteUseCase).applyProvenance(runId, orgId, executionId, prov, 2, "1 failed");
     }
 }

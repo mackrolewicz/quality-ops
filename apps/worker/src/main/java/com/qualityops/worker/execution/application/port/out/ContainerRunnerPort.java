@@ -50,7 +50,18 @@ public interface ContainerRunnerPort {
         String workingDir, Map<String, String> env,
         Path workspaceHostDir, ResourceLimits limits,
         NetworkMode network, Duration timeout,
-        Map<String, String> labels) {
+        Map<String, String> labels,
+        Map<Path, String> secretBinds) { // host path -> container absolute path, ALWAYS read-only
+
+        /** Convenience — no secret binds. Keeps the pre-ADR-009-fix-1 13-arg
+         *  call sites (e.g. {@code frameworkSpec}) compiling unchanged. */
+        public ContainerRunSpec(UUID executionId, int attemptEpoch, String phase, String imageRef,
+                                List<String> entrypoint, List<String> command, String workingDir,
+                                Map<String, String> env, Path workspaceHostDir, ResourceLimits limits,
+                                NetworkMode network, Duration timeout, Map<String, String> labels) {
+            this(executionId, attemptEpoch, phase, imageRef, entrypoint, command, workingDir, env,
+                workspaceHostDir, limits, network, timeout, labels, Map.of());
+        }
 
         public String containerName() {
             return "qualityops-run-" + executionId + "-" + attemptEpoch + "-" + phase;

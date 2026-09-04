@@ -50,13 +50,14 @@ public class RepositoryRunWriteService implements RepositoryRunWriteUseCase {
     }
 
     @Override
-    public void applyProvenance(UUID runId, UUID orgId, UUID executionId,
-                                RepositoryRunProvenance p, int attemptEpoch) {
+    public void applyProvenance(UUID runId, UUID orgId, UUID executionId, RepositoryRunProvenance p,
+                                int attemptEpoch, String errorDetail) {
         int rows = repository.applyTelemetry(runId, orgId, executionId, p.imageDigest(), p.exitCode(),
             p.itemsTotal(), p.itemsPassed(), p.itemsFailed(), p.itemsSkipped(),
-            p.checkoutAt(), p.startedAt(), p.finishedAt());
+            p.checkoutAt(), p.startedAt(), p.finishedAt(), errorDetail, attemptEpoch);
         if (rows == 0) {
-            log.debug("repository_run applyProvenance for run {} exec {} epoch {} matched no row — no-op",
+            log.debug("repository_run applyProvenance for run {} exec {} epoch {} matched no row — no-op "
+                + "(non-repo run, cancelled, stale executionId, or a lower/equal attempt epoch)",
                 runId, executionId, attemptEpoch);
         }
     }

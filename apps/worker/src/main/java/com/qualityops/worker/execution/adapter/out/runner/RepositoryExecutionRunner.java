@@ -36,16 +36,19 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 /**
  * ADR-009 §1/§6/§7/§8/§9/§10 — orchestrates one repository-run case as two
@@ -162,20 +165,39 @@ public class RepositoryExecutionRunner implements ExecutionRunner {
                                           List<String> consoleLines, Redactor.RedactionView redaction,
                                           Instant caseStart, String imageDigest) {
         // 4. checkout container — SideEffectClass stays NONE_OBSERVED throughout.
+        // The checkout token, if any, never enters env/argv: it is written to a
+        // host-only file (sibling to, never inside, the workspace dir — the
+        // framework phase never sees it) and bind-mounted read-only into the
+        // checkout container; a git credential helper reads it directly. The
+        // secrets dir is always removed in the finally, whether checkout
+        // succeeded or failed.
+        Path secretsDir = checkoutToken == null ? null : secretsDirFor(ctx);
         ContainerRunResult checkoutResult;
         try {
-            checkoutResult = containerRunner.run(checkoutSpec(ctx, repo, workspaceDir, checkoutToken),
-                sink, ctx.cancellation());
-        } catch (ImageNotAllowlistedException e) {
-            metrics.blocked("image_not_allowlisted");
-            return blockedResult(c, ctx, caseStart, "checkout image is not on the allowlist");
-        } catch (DigestMismatchException e) {
-            metrics.blocked("digest_mismatch");
-            return blockedResult(c, ctx, caseStart, "checkout image digest mismatch");
-        } catch (ContainerRunException e) {
-            metrics.run(repo.framework().name(), "error");
-            return errorResult(c, ctx, caseStart, "checkout container failed to start",
+            if (secretsDir != null) {
+                writeCheckoutTokenFile(secretsDir, checkoutToken);
+            }
+            try {
+                checkoutResult = containerRunner.run(checkoutSpec(ctx, repo, workspaceDir, secretsDir),
+                    sink, ctx.cancellation());
+            } catch (ImageNotAllowlistedException e) {
+                metrics.blocked("image_not_allowlisted");
+                return blockedResult(c, ctx, caseStart, "checkout image is not on the allowlist");
+            } catch (DigestMismatchException e) {
+                metrics.blocked("digest_mismatch");
+                return blockedResult(c, ctx, caseStart, "checkout image digest mismatch");
+            } catch (ContainerRunException e) {
+                metrics.run(repo.framework().name(), "error");
+                return errorResult(c, ctx, caseStart, "checkout container failed to start",
+                    SideEffectClass.NONE_OBSERVED, repo, null, consoleLines, List.of());
+            }
+        } catch (IOException e) {
+            return errorResult(c, ctx, caseStart, "could not stage checkout credentials",
                 SideEffectClass.NONE_OBSERVED, repo, null, consoleLines, List.of());
+        } finally {
+            if (secretsDir != null) {
+                deleteSecretsDir(secretsDir);
+            }
         }
         Instant checkoutAt = checkoutResult.finishedAt();
         if (checkoutResult.cancelled()) {
@@ -262,13 +284,62 @@ public class RepositoryExecutionRunner implements ExecutionRunner {
 
     // --- container spec builders ---
 
+    private static final String SECRET_TOKEN_FILE = "checkout-token";
+    private static final String SECRET_TOKEN_CONTAINER_PATH = "/run/secrets/checkout-token";
+
     private ContainerRunSpec checkoutSpec(CaseExecutionContext ctx, RepoTestSnapshot repo, Path workspaceDir,
-                                          String checkoutToken) {
-        Map<String, String> env = checkoutToken == null ? Map.of() : Map.of("CHECKOUT_TOKEN", checkoutToken);
+                                          Path secretsDir) {
+        boolean hasToken = secretsDir != null;
+        Map<Path, String> secretBinds = hasToken
+            ? Map.of(secretsDir.resolve(SECRET_TOKEN_FILE), SECRET_TOKEN_CONTAINER_PATH) : Map.of();
         return new ContainerRunSpec(ctx.executionId(), ctx.attemptEpoch(), "checkout",
-            props.images().checkout(), List.of("sh", "-c"), List.of(checkoutScript(repo, checkoutToken != null)),
-            "/workspace", env, workspaceDir, resourceLimits(repo), NetworkMode.EGRESS, ctx.effectiveTimeout(),
-            Map.of(LABEL_RUN, ctx.runId().toString()));
+            props.images().checkout(), List.of("sh", "-c"), List.of(checkoutScript(repo, hasToken)),
+            "/workspace", Map.of(), workspaceDir, resourceLimits(repo), NetworkMode.EGRESS, ctx.effectiveTimeout(),
+            Map.of(LABEL_RUN, ctx.runId().toString()), secretBinds);
+    }
+
+    /** Sibling to (never inside) the per-attempt workspace dir — the framework
+     *  container never mounts this, so the checkout token never reaches it. */
+    private Path secretsDirFor(CaseExecutionContext ctx) {
+        return props.workspaceRootPath().resolve(ctx.executionId().toString())
+            .resolve(ctx.attemptEpoch() + "-secrets");
+    }
+
+    /** Host-only file, bind-mounted read-only into the checkout container. Best-
+     *  effort POSIX perms (world-readable file so the container's non-root uid
+     *  can read it; Windows has no POSIX perms — that's fine, this box never
+     *  runs real containers against this path). */
+    private static void writeCheckoutTokenFile(Path secretsDir, String token) throws IOException {
+        Files.createDirectories(secretsDir);
+        try {
+            Files.setPosixFilePermissions(secretsDir, PosixFilePermissions.fromString("rwxr-xr-x"));
+        } catch (UnsupportedOperationException ignored) {
+            // Windows — no POSIX perms.
+        }
+        Path tokenFile = secretsDir.resolve(SECRET_TOKEN_FILE);
+        Files.writeString(tokenFile, token, StandardCharsets.UTF_8);
+        try {
+            Files.setPosixFilePermissions(tokenFile, PosixFilePermissions.fromString("r--r--r--"));
+        } catch (UnsupportedOperationException ignored) {
+            // Windows — no POSIX perms.
+        }
+    }
+
+    private void deleteSecretsDir(Path secretsDir) {
+        if (!Files.exists(secretsDir)) {
+            return;
+        }
+        try (Stream<Path> walk = Files.walk(secretsDir)) {
+            walk.sorted(Comparator.reverseOrder()).forEach(p -> {
+                try {
+                    Files.deleteIfExists(p);
+                } catch (IOException ignored) {
+                    // best effort
+                }
+            });
+        } catch (IOException e) {
+            log.warn("could not delete secrets dir {}: {}", secretsDir, e.toString());
+        }
     }
 
     private ContainerRunSpec frameworkSpec(CaseExecutionContext ctx, RepoTestSnapshot repo, Path workspaceDir,
@@ -303,19 +374,31 @@ public class RepositoryExecutionRunner implements ExecutionRunner {
 
     /** Platform-controlled checkout entrypoint (ADR §6) — the repo cannot
      *  override it. {@code host}/{@code repoPath}/{@code commitSha} are
-     *  regex-validated by {@link #isSpecValid} before this is ever built. */
+     *  regex-validated by {@link #isSpecValid} before this is ever built.
+     *
+     *  <p>When there is a checkout token, {@code fetch} runs with an inline
+     *  {@code credential.helper} whose ENTIRE source is static shell-function
+     *  text — it contains only a fixed path
+     *  ({@link #SECRET_TOKEN_CONTAINER_PATH}), never the token value itself.
+     *  The helper's {@code cat} runs inside git's own credential subprocess;
+     *  its stdout is consumed by git's internal credential protocol, not
+     *  re-emitted to the container's own stdout/stderr — so the token never
+     *  appears in {@code Config.Cmd}/argv (visible via {@code docker inspect}
+     *  even through the {@code docker-proxy} allowlist), in {@code docker
+     *  top}/process listings, or in the console log this runner captures via
+     *  {@link ContainerRunnerPort.LogSink}. This is the standard, secure git
+     *  credential-helper pattern — no exec, no tmpfs, no env var. */
     private static String checkoutScript(RepoTestSnapshot repo, boolean hasToken) {
         String url = "https://" + repo.repoHost() + "/" + repo.repoPath() + ".git";
         var sb = new StringBuilder("git init /workspace >/dev/null && cd /workspace && git remote add origin '")
             .append(url).append('\'');
+        sb.append(" && git");
         if (hasToken) {
-            sb.append(" && printf '#!/bin/sh\\necho \"$CHECKOUT_TOKEN\"\\n' > /tmp/askpass.sh")
-                .append(" && chmod +x /tmp/askpass.sh")
-                .append(" && export GIT_ASKPASS=/tmp/askpass.sh GIT_TERMINAL_PROMPT=0");
+            sb.append(" -c credential.helper='!f() { echo username=x-access-token; echo password=\"$(cat ")
+                .append(SECRET_TOKEN_CONTAINER_PATH).append(")\"; }; f'");
         }
-        sb.append(" && git fetch --depth 1 origin ").append(repo.commitSha());
+        sb.append(" fetch --depth 1 origin ").append(repo.commitSha());
         sb.append(" && git checkout --detach ").append(repo.commitSha());
-        sb.append("; rc=$?; rm -f /tmp/askpass.sh; exit $rc");
         return sb.toString();
     }
 

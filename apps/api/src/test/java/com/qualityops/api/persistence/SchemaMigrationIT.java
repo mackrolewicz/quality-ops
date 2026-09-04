@@ -11,13 +11,13 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Locks down the shape the Flyway migrations (V1–V25) must produce: the context
+ * Locks down the shape the Flyway migrations (V1–V26) must produce: the context
  * only starts because {@code ddl-auto=validate} accepts the migrated schema, and
  * these assertions pin the details Hibernate does not check (enum labels, the
  * jsonb column type, the results uniqueness constraint, the Phase 2C queue /
  * schedule / shedlock structure, the Phase 2E analytics indexes + environment
  * health + audit_log tables, the Phase 2F repository_connection / repository_run
- * / repository_test_item tables).
+ * / repository_test_item tables, and repository_run's V26 attempt_epoch guard).
  */
 class SchemaMigrationIT extends AbstractPostgresIT {
 
@@ -38,13 +38,13 @@ class SchemaMigrationIT extends AbstractPostgresIT {
     }
 
     @Test
-    void flywayHistory_afterMigration_containsVersions1Through25() {
+    void flywayHistory_afterMigration_containsVersions1Through26() {
         List<String> versions = jdbc.queryForList(
             "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank",
             String.class);
 
         assertThat(versions).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11",
-            "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25");
+            "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26");
     }
 
     @Test
@@ -451,6 +451,18 @@ class SchemaMigrationIT extends AbstractPostgresIT {
         List<String> indexes = jdbc.queryForList(
             "SELECT indexname FROM pg_indexes WHERE tablename = 'repository_run'", String.class);
         assertThat(indexes).contains("idx_repository_run_org", "idx_repository_run_conn");
+    }
+
+    @Test
+    void repositoryRun_afterMigration_hasAttemptEpochColumnNotNullDefaultZero() {
+        String nullable = jdbc.queryForObject(
+            "SELECT is_nullable FROM information_schema.columns "
+                + "WHERE table_name='repository_run' AND column_name='attempt_epoch'", String.class);
+        String columnDefault = jdbc.queryForObject(
+            "SELECT column_default FROM information_schema.columns "
+                + "WHERE table_name='repository_run' AND column_name='attempt_epoch'", String.class);
+        assertThat(nullable).isEqualTo("NO");
+        assertThat(columnDefault).contains("0");
     }
 
     @Test
