@@ -28,66 +28,161 @@ You design the system → Claude Code executes → you review, fix, learn.
 Everything lives in one monorepo — one docker compose up, one Claude Code
 workspace, all layers visible and connected.
 
-## Phase 1: Foundation (you are here)
+## Phase 1: Foundation
 **Goal:** Working skeleton with basic CRUD, simulated test execution, and
 security foundations.
+**Status:** ✅ Complete — 2026-08-31.
 
 | Deliverable | Status |
 |---|---|
 | Project structure + Claude Code setup | Done |
-| Spring Boot API skeleton (hexagonal modules) | Not started |
-| React frontend shell with routing | Not started |
-| **Google Stitch DESIGN.md** (design tokens + rationale) | Not started |
-| PostgreSQL + Flyway migrations | Not started |
-| Docker Compose (full local stack) | Not started |
-| **Spring Security + JWT auth** | Not started |
-| **RBAC (Owner/Admin/Member/Viewer)** | Not started |
-| **Security headers at Gateway** | Not started |
-| **CORS configuration** | Not started |
-| **Gateway-level rate limiting (Redis)** | Not started |
-| Project CRUD (API + UI) | Not started |
-| Environment registry (API + UI) | Not started |
-| Test suite + case catalog (API + UI) | Not started |
-| Run orchestration via Kafka (event-driven) | Not started |
-| Kafka consumers inside API app (same JVM) | Not started |
-| Simulated test execution (in API, not a separate worker yet) | Not started |
-| Results dashboard (API + UI) | Not started |
-| GitHub Actions CI pipeline | Not started |
-| Spring Cloud Gateway routing | Not started |
-| **Input validation (@Valid on all endpoints)** | Not started |
-| **OpenAPI spec generation** | Not started |
+| Spring Boot API skeleton (hexagonal modules) | Done |
+| React frontend shell with routing | Done |
+| **Google Stitch DESIGN.md** (design tokens + rationale) | Done |
+| PostgreSQL + Flyway migrations | Done |
+| Docker Compose (full local stack) | Done |
+| **Spring Security + JWT auth** | Done |
+| **RBAC (Owner/Admin/Member/Viewer)** | Done |
+| **Security headers at Gateway** | Done |
+| **CORS configuration** | Done |
+| **Gateway-level rate limiting (Redis)** | Done |
+| Project CRUD (API + UI) | Done |
+| Environment registry (API + UI) | Done |
+| Test suite + case catalog (API + UI) | Done |
+| Run orchestration via Kafka (event-driven) | Done |
+| Kafka consumers inside API app (same JVM) | Done |
+| Simulated test execution (in API, not a separate worker yet) | Done |
+| Results dashboard (API + UI) | Done |
+| GitHub Actions CI pipeline | Done |
+| Spring Cloud Gateway routing | Done |
+| **Input validation (@Valid on all endpoints)** | Done |
+| **OpenAPI spec generation** | Done |
 
 **Exit criteria:** `docker compose up` gives you a working platform. User
 can log in → create project → add suite → trigger run → see results.
 All endpoints authenticated. Rate limiting active.
 
+**Verified:** unit suite (mvn -DskipITs verify), Testcontainers ITs
+SchemaMigrationIT / RunRepositoryJsonbIT / RunOrchestrationKafkaIT + GatewayIT
+(mvn verify), frontend lint + typecheck + vitest + build, Playwright smoke e2e
+against the compose stack.
+
 ---
 
-## Phase 2: Core Platform
+## Phase 2: Core Platform (you are here)
 **Goal:** Real test execution, richer analytics, production-grade features.
+**Status:** In progress. Phase 2A (Extract Worker) **complete — 2026-08-31**, see
+`docs/architecture/decisions/002-worker-extraction.md`. Phase 2B1 (real API-test
+execution) **complete — 2026-09-01**, see
+`docs/architecture/decisions/003-real-api-execution.md`. Phase 2B2 (real
+Playwright browser execution) **complete — 2026-09-01**, see
+`docs/architecture/decisions/004-playwright-browser-execution.md`. Increment 2B3
+(durable artifacts + per-case `results.chunk` streaming + bounded in-run retry +
+`secretRef`) **complete — 2026-09-02**, see
+`docs/architecture/decisions/005-artifact-storage-and-result-streaming.md`.
+Increment 2C (queue-driven scheduling & execution control) **complete —
+2026-09-03**, see `docs/architecture/decisions/006-scheduling-and-queue.md`
+(with its *2C design-point resolutions & audit follow-ups* amendment). Verified:
+`mvn verify` across all 4 modules incl. Testcontainers ITs (`SchedulingTickIT`,
+`RunCancellationIT`, `QueueDispatchFailureIT`, `QueueDispatchCancelRaceIT`,
+`QueueMetricsRefresherIT`), frontend lint/typecheck/vitest/build, and a full
+`docker compose up` stack + Playwright smoke e2e.
+2D and 2E are now also complete (see `docs/product/PHASE-2-PLAN.md`). Phase 2F,
+the repository-owned framework runner, has landed but is not yet verified
+end-to-end — see the 🚧 note under "Phase 2F" below.
 
 | Deliverable | Notes |
 |---|---|
-| **Extract Worker from API** | Split Kafka consumers into separate Spring Boot app |
-| Playwright test runner in Worker | Execute real browser tests |
-| API test runner in Worker | HTTP-based test execution |
-| Retry logic for failed tests | Configurable retry count |
-| Run scheduling (cron-based) | Schedule recurring runs |
-| Flaky test detection | Track test stability over N runs |
-| Test duration trends | Chart slowest tests over time |
-| Environment health monitoring | Periodic health checks |
-| Redis caching for dashboard | Fast dashboard reads |
-| WebSocket for real-time updates | Replace polling |
-| **Application-level rate limiting** | Per-operation limits (runs/hour, AI calls) |
-| **Spring AOP and pointcuts** | Custom `@Audited` and `@Timed` annotations; aspects for audit events and slow-operation metrics |
-| **AOP proxy behavior tests** | Verify `@Around`/`@Before`, exception propagation, annotation pointcuts, and Spring self-invocation limitation |
-| **HTTPS in staging environment** | TLS termination at load balancer |
-| **Dependency vulnerability scanning** | `mvn dependency-check`, `npm audit` in CI |
-| **Container image scanning** | Trivy in CI pipeline |
+| **Extract Worker from API** | ✅ **Done — Phase 2A (ADR-002).** `apps/worker` consumes `runs.requested`; `apps/api` keeps the lifecycle/result consumers and stays the sole DB writer; event contracts in `packages/shared-events`. |
+| Playwright test runner in Worker | ✅ **Done — Phase 2B2 (ADR-004).** Embedded Playwright for Java behind the `ExecutionRunner` port; declarative scenario (no user JS/shell); fresh `BrowserContext` per execution; test/step/navigation/hard-kill timeouts; SSRF on `startUrl` + `NAVIGATE` + sub-resource interception; FILL/URL/DOM redaction; temp-only screenshots/traces swept every 30 min; `SCHEMA_VERSION` 3. |
+| API test runner in Worker | ✅ **Done — Phase 2B1 (ADR-003).** `ApiExecutionRunner` (JDK `HttpClient`), per-case runner selection, SSRF guard + redaction + bounded response memory, `execution_id`-guarded lifecycle, durable dedup ledger (`worker` schema). |
+| **Test artifact storage** | ✅ **Done — Phase 2B3 (ADR-005).** `ArtifactStoragePort` + `S3ArtifactStorage` (MinIO); org-first path-addressed keys, SSE-S3, retention lifecycle rule; Worker write-only, API read-only presigned GET (`GET /api/v1/runs/{id}/artifacts`, `/api/v1/artifacts/{id}`); best-effort per-case upload never blocks the terminal. |
+| Retry logic for failed tests | ✅ **Done — Phase 2B3 (ADR-005).** Bounded **in-run** retry for transient `TIMEOUT`/`ERROR` with `SideEffectClass.NONE_OBSERVED` and wall-clock budget room; never `FAILED`/`BLOCKED`. Queue-driven retry is 2C. |
+| Per-case result streaming | ✅ **Done — Phase 2B3 (ADR-005).** `results.chunk` topic + `ResultChunkEvent`; epoch-monotone upsert shared with the v4 terminal (`test_results.attempt_epoch`, `test_result_artifacts`, V11). Dashboard WebSocket push is 2E. |
+| `secretRef` credential indirection | ✅ **Done — Phase 2B3 (ADR-005).** `HttpHeader.secretRef` / `BrowserStep.secretValue`; env/file resolver at execution time (Key Vault is Phase 5); plaintext never on an event/snapshot/log/result/artifact. |
+| **Scheduling module** | ✅ **Done — Phase 2C (ADR-006).** `com.qualityops.api.scheduling` — one-time + recurring (6-field Spring cron + IANA time zone, DST-correct), pause/resume, `SKIP_MISSED`/`FIRE_ONCE` catch-up, next-fires preview; `schedule_fire (schedule_id, fire_slot)` unique ledger ⇒ at most one run per logical occurrence. |
+| **Scheduler leader coordination** | ✅ **Done — Phase 2C (ADR-006).** `net.javacrumbs.shedlock` over the `shedlock` PostgreSQL table (V12); `@EnableSchedulerLock`, `.usingDbTime()`; two global locks (`scheduling-tick`, `queue-dispatch`). Lock-store outage ⇒ "nothing fires", never "twice". |
+| **Test queue management** | ✅ **Done — Phase 2C (ADR-006).** Authoritative `run_queue` (V13); `trigger` enqueues (`test_runs` PENDING + `run_queue` QUEUED with the frozen `RunRequestedEvent`) and publishes nothing; `QueueDispatchJob` claims-then-publishes `runs.requested`. |
+| **Queue priorities** | ✅ **Done — Phase 2C (ADR-006).** DB-ordered dispatcher (not priority topics): effective-priority `ORDER BY` with a per-minute aging boost so LOW never starves; `HIGH` gated to OWNER/ADMIN. |
+| **Per-tenant concurrency limits** | ✅ **Done — Phase 2C (ADR-006).** `max-active-runs-per-org` (default 5) + `org_run_concurrency` overrides (read path); the dispatcher walks the priority-ordered list once, serving other orgs when one is at cap. Write API/UI is 2D+. |
+| **Queued-run controls** | ✅ **Done — Phase 2C (ADR-006).** `GET /api/v1/runs?queueState=`; `POST /api/v1/runs/{id}/cancel` — QUEUED ⇒ `CANCELLED`, no Kafka (never executes); DISPATCHED/RUNNING ⇒ cooperative via `runs.cancel` + in-memory Worker `CancellationRegistry` (`202`). |
+| **Queue observability** | ✅ **Done — Phase 2C meters (ADR-006); admin summary + Grafana JSON Phase 2D (ADR-007).** Micrometer meters on `/actuator/prometheus`; `GET /api/v1/admin/queue` org-scoped summary (depth per priority, oldest-age, active, process-wide dispatch/reaper/retry counters); `infra/grafana/queue-dashboard.json`. 2D also adds `qualityops.queue.reaped`/`retries` and `qualityops.webhook.delivery(_duration)` meters. |
+| **CI execution API** | ✅ **Done — Phase 2D (ADR-007).** Idempotent `POST /api/v1/ci/runs` keyed by an `Idempotency-Key` header, `ci_idempotency_key` table `UNIQUE (org_id, idempotency_key)` + request fingerprint (409 `IDEMPOTENCY_KEY_CONFLICT` on drift), 200 on both first and repeat; reuses the caller's JWT (scoped CI tokens Phase 4); `docs/api/ci-execution.md` has GitHub Actions / GitLab CI / Jenkins curl snippets (no plugin). |
+| **Caseflow execution contract** | ✅ **Done — Phase 2D (ADR-007).** `docs/api/caseflow-v1.yaml` (OpenAPI 3.1) over submit=`POST /api/v1/ci/runs`, status=`GET /api/v1/runs/{id}`, cancel=`POST /api/v1/runs/{id}/cancel`, results/artifacts; signed completion webhooks from a new `com.qualityops.api.webhook` module (HMAC-SHA256 `X-QualityOps-Signature`, timestamp header, `webhook_delivery` outbox + backoff to `EXHAUSTED`, `qualityops.webhook.delivery` metric). |
+| **Repository-owned framework execution** | 🚧 **Implementation complete, verification pending — Phase 2F (ADR-009).** `scm` module + `RepositoryExecutionRunner`/`ContainerRunnerPort` land; ref→SHA resolved at enqueue, digest-pinned runner-image allowlist, compose network split + `docker-proxy`. Suite-authored only (no ad-hoc run-now-from-connection). Not yet ✅ — the full-stack `docker compose up` + Playwright smoke pass is still outstanding. |
+| Flaky test detection | ✅ **Done — Phase 2E (ADR-008).** `GET /api/v1/analytics/flaky` — per-`test_case_id` flakiness/stability (status transitions ÷ runs−1) over the last N results; on-the-fly native window query, Redis-cached, no materialised stats table (`V19` = analytics indexes). |
+| Test duration trends | ✅ **Done — Phase 2E (ADR-008).** `GET /api/v1/analytics/trends` (daily run pass/fail + avg/p95 case duration, zero-filled) and `GET /api/v1/analytics/slow` (top-N `test_case_id` by p95 `duration_ms`); grouped native aggregates over `test_results.duration_ms`. |
+| Environment health monitoring | ✅ **Done — Phase 2E (ADR-008).** A fifth ShedLock `@Scheduled` probe (`environment-health-probe`) checks `STAGING`/`PRODUCTION` `base_url`s → `HEALTHY|DEGRADED|DOWN`; `environments.health_status` (`VARCHAR + CHECK`) + `environment_health_check` history (`V20`); `GET /api/v1/environments/{id}/health`; SSRF-guarded, network I/O outside any DB tx. |
+| Redis caching for dashboard | ✅ **Done — Phase 2E (ADR-008).** `spring-boot-starter-cache` + `RedisCacheManager` (30 s TTL, per-`orgId` key prefix) on the analytics reads and `runs.list`; fail-open to Postgres on a Redis error; per-org `SCAN`+evict from `RunLifecycleService` on a terminal transition. |
+| WebSocket for real-time updates | ✅ **Done — Phase 2E (ADR-008).** `realtime` module: STOMP-over-SockJS `/ws`, JWT on `CONNECT`, org-checked `SUBSCRIBE /topic/runs/{runId}`; existing `runs.*`/`results.chunk` consumers push `RunProgressEvent` via a `RunProgressNotifier` port + a Redis pub/sub bridge across replicas — **no new Kafka topic**. Gateway `/ws/**` route without rate limiting. |
+| **Application-level rate limiting** | ✅ **Done — Phase 2E (ADR-008).** `@RateLimited` + a Spring MVC `HandlerInterceptor` (not an aspect) on `POST /api/v1/runs` (60/h) and `POST /api/v1/ci/runs` (120/h); Redis fixed-window per `(orgId, operation)`; `429` + `Retry-After` + `X-RateLimit-*`; fails open on a Redis error. Distinct from the gateway's per-IP limiter. |
+| **Spring AOP and pointcuts** | ✅ **Done — Phase 2E (ADR-008).** `audit` module: `@Audited` → `AuditAspect` (`@Order(10)`) writes an `audit_log` row (`V21`) via `AuditRecorder` (`REQUIRES_NEW` + swallow); `@Timed` → `TimingAspect` (`@Order(0)`) records `qualityops.slow_op{op}` + `.exceeded`. Applied to org-concurrency/environment/project/suite/webhook mutations and `RunService.trigger`. |
+| **AOP proxy behavior tests** | ✅ **Done — Phase 2E (ADR-008).** `AuditAspectTest` (SUCCESS/FAILURE + rethrow-unchanged), `TimingAspectTest` (threshold + `exceeded`), `AopOrderingTest` (timing wraps audit), `AopSelfInvocationTest` (proxied call fires; `this.other()` does not); the self-invocation limitation is documented in the ADR + `.claude/rules/java-backend.md`. |
+| **HTTPS in staging environment** | ✅ **Done — Phase 2E (ADR-008).** Config + docs (k8s/Helm ingress TLS is Phase 5): `apps/gateway/.../application-staging.yml` enables `server.ssl.*` from env vars only (no committed keystore); recommended path terminates TLS at the LB/ingress; HSTS unchanged; `docs/runbooks/https-staging.md`; `GatewayStagingProfileIT`. |
+| **Dependency vulnerability scanning** | ✅ **Done — Phase 2E (ADR-008).** `security-scan` CI job runs OWASP Dependency-Check (`mvn -Psecurity-scan verify`, `failBuildOnCVSS=7`); `npm audit --audit-level=high --omit=dev` in the `web` job; time-boxed `CODEOWNERS`-guarded suppression file; `docs/runbooks/security-scanning.md`. |
+| **Container image scanning** | ✅ **Done — Phase 2E (ADR-008).** Trivy image scans (api/worker/gateway) in the `security-scan` job — `HIGH,CRITICAL`, `exit-code 1`, `ignore-unfixed`, `.trivyignore` (time-boxed, `CODEOWNERS`-guarded); SARIF uploaded to code scanning. |
 
 **Exit criteria:** Platform can execute real Playwright and API tests,
 detect flaky tests, and show meaningful analytics. Cross-cutting audit and
-timing concerns use tested Spring AOP aspects. HTTPS in staging.
+timing concerns use tested Spring AOP aspects. Scheduled and CI-triggered runs
+are queued idempotently, respect tenant concurrency limits, and can be monitored
+or cancelled. Caseflow can integrate through the documented execution contract.
+Users can also launch tests stored in Git repositories without running untrusted
+repository code inside the API or long-lived Worker. HTTPS in staging.
+
+### Phase 2F — Repository-owned framework execution (after 2E)
+
+> **🚧 Implementation complete, verification pending (2026-09-04).**
+> Authoritative record: `docs/architecture/decisions/009-repository-owned-framework-execution.md`.
+> Every work package's own gates are green (backend `mvn verify` per module,
+> `docker compose config`, frontend lint/typecheck/vitest/build). **Do not mark
+> this phase ✅ done** until the full-stack `docker compose up` (against the
+> network-split compose topology) and the `repository-run` Playwright E2E
+> smoke both pass. Scope was narrowed during implementation to
+> **suite-authored only** — see the ADR and `PHASE-2-PLAN.md` §2F for detail;
+> there is no ad-hoc "run now from a connection" endpoint in 2F.
+
+**Goal:** Run existing test projects from GitHub or GitLab through the same
+QualityOps queue, scheduling, result, and artifact flows.
+
+**User workflow:**
+1. Connect a repository using a credential reference; never persist a plaintext
+   Git token.
+2. Configure the branch/tag, framework preset, working directory, test command,
+   environment references, secret references, timeout, and resource limits.
+3. From the UI, choose **Run now** or attach the configuration to a schedule.
+4. Resolve the selected Git ref to an immutable commit SHA before creating the
+   run snapshot.
+5. Queue the run through PostgreSQL + Kafka like every other execution.
+6. An isolated disposable runner checks out that exact commit and executes the
+   repository-owned Playwright, JUnit, pytest, Cypress, or k6 project.
+7. Normalize framework reports, logs, and artifacts into QualityOps results and
+   display them in the existing run UI.
+
+**Architecture and security guardrails:**
+- Add a repository test specification and runner kind behind the existing
+  execution-runner port; keep provider APIs behind SCM ports.
+- Run untrusted repository code only in an ephemeral container/job, never in
+  the API process or the long-lived Kafka Worker.
+- Phase 2F uses a local Docker adapter. Phase 5 replaces it with a Kubernetes
+  Job or VM adapter without changing queue or domain logic.
+- Use only allowlisted, digest-pinned runner images. Run as non-root with no
+  privileged mode, dropped Linux capabilities, a read-only root filesystem,
+  bounded CPU/memory/PIDs/disk/time, and unconditional workspace cleanup.
+- Keep runners off the Postgres/Redis/Kafka application network. Deny outbound
+  network access by default; explicit policies may allow target systems or a
+  dependency proxy.
+- Resolve checkout and test secrets just in time, mask them from commands,
+  logs, reports, and artifacts, and revoke/expire short-lived credentials.
+- Preserve tenant isolation, idempotency, cancellation, retry safety, exact
+  commit provenance, and artifact key scoping.
+
+**Exit criteria:** A user can connect a sample repository, launch the same
+commit from the UI and a schedule, observe it pass through the normal queue,
+cancel a running job, and view parsed test items, logs, and artifacts. Duplicate
+delivery does not create a second container. Security tests prove that the
+runner cannot reach internal data services, escape its resource limits, leak a
+secret, use an unapproved image, or leave a workspace behind.
 
 ---
 
@@ -232,7 +327,11 @@ passes all subscription lifecycle scenarios.
 | Azure Database for PostgreSQL | Managed DB |
 | Azure Cache for Redis | Managed cache |
 | Kafka decision: Confluent Cloud or Event Hubs | Managed messaging |
+| **Azure Blob Storage for test artifacts** | Replace the MinIO adapter through the storage port; private containers, short-lived SAS URLs, retention and lifecycle policies |
 | GitHub Actions deploy pipeline | Build → push → deploy to AKS |
+| **Ephemeral execution workers** | Launch isolated test runners as Kubernetes Jobs; evaluate Azure VM Scale Sets for VM-required workloads |
+| **Jenkins agent integration** | Jenkins plugin/API adapter can dispatch work to ephemeral Kubernetes or VM agents and report status back |
+| **Queue-driven worker autoscaling** | Scale workers from Kafka consumer lag and queued-job age using KEDA/HPA |
 | OpenTelemetry instrumentation | Distributed tracing |
 | Prometheus + Grafana | Metrics dashboards |
 | Loki for centralized logging | Searchable logs |
@@ -245,7 +344,8 @@ passes all subscription lifecycle scenarios.
 | **HSTS with preload** | Force HTTPS everywhere |
 | **Azure Key Vault for secrets** | No secrets in K8s manifests |
 | **Network policies** | Restrict pod-to-pod traffic |
-| **mTLS between services** (optional) | Istio/Linkerd service mesh |
+| **Service mesh and mTLS** (optional) | Start with Linkerd for API ↔ Worker identity, encryption, metrics, and retry visibility |
+| **Leader election under autoscaling** | Verify scheduler exclusivity with multiple replicas; compare JDBC locking with Kubernetes Lease coordination |
 | **DAST scanning in staging** | OWASP ZAP automated scans |
 | **Penetration testing** | Manual security review before go-live |
 
@@ -368,6 +468,8 @@ is mandatory for MVP — pick what you want to learn that week.
 | Consistent Hashing | Distribute runs across Workers | Hard |
 | Database Sharding | Shard by org_id | Hard |
 | Service Mesh | Istio between services | Hard |
+| Object Storage | MinIO locally, then Azure Blob; upload and retrieve private test artifacts | Medium |
+| Leader Election | Run multiple scheduler replicas and prove each schedule dispatches once | Medium |
 | Bloom Filter | Fast "was this test ever flaky?" lookup | Medium |
 | Change Data Capture | Debezium → Kafka for real-time sync | Medium |
 | gRPC | Internal service-to-service communication | Medium |
@@ -482,6 +584,21 @@ One row per concept: where it lives in the lab and what to build or study.
 **Depth:** Production = real feature in product phases; Exercise = Phase 7
 spike; Theory = ADR + docs + interview prep (no full implementation required).
 
+The concepts below fall into six learning tracks:
+
+- **Domain and architecture:** modular monolith, hexagonal architecture, DDD,
+  state machines, microservice extraction, API design, AOP, CQRS, and sagas.
+- **Communication and execution:** REST, Kafka, queues, scheduling, WebSockets,
+  gRPC, retries, idempotency, backpressure, and CI-triggered execution.
+- **Data and storage:** PostgreSQL, Redis, object storage, caching strategies,
+  transactions, outbox, replication, sharding, CDC, and eventual consistency.
+- **Reliability and concurrency:** circuit breakers, bulkheads, distributed
+  locks, leader election, load shedding, graceful degradation, and chaos tests.
+- **Security and identity:** JWT, RBAC, OAuth/OIDC, SSO, MFA, rate limiting,
+  TLS/mTLS, secrets, audit logging, and OWASP testing.
+- **Scale and operations:** Docker, Kubernetes, service discovery, service mesh,
+  Terraform, CI/CD, observability, k6, autoscaling, CDN, DNS, and multi-region.
+
 #### Security, auth, and gateway
 
 | Concept | Depth | Phase | Concrete exercise |
@@ -564,6 +681,7 @@ spike; Theory = ADR + docs + interview prep (no full implementation required).
 | Read replica | Exercise | 7 | Postgres replica for analytics queries |
 | Database sharding | Exercise | 7 | Shard by `org_id`; routing layer spike |
 | Replication (DB HA) | Production | 5 | Azure Database for PostgreSQL HA option |
+| Object storage | Production | 2, 5 | `ArtifactStoragePort`: MinIO locally, Azure Blob in cloud; private access and lifecycle retention |
 | Eventual consistency | Production + Theory | 2, 4B, 7 | Kafka + DB; Stripe webhook sync; ADR on trade-offs |
 
 #### Messaging, queuing, and execution
@@ -571,6 +689,15 @@ spike; Theory = ADR + docs + interview prep (no full implementation required).
 | Concept | Depth | Phase | Concrete exercise |
 |---|---|---|---|
 | Queuing | Production | 1–2 | Kafka topics: `test-runs.requested`, etc. |
+| Queue state and delivery split | Production | 2 | PostgreSQL stores status/priority/cancellation; Kafka transports immutable jobs |
+| Scheduling | Production | 2 | One-time and cron schedules publish idempotent execution requests when due |
+| Priority queues | Production + Exercise | 2, 7 | High/normal/low Kafka topics; test starvation and weighted dispatch |
+| Tenant fairness | Production + Exercise | 2, 7 | Per-org concurrency limits and fair dispatch under noisy-neighbor load |
+| Queue observability | Production | 2 | Measure lag, depth, queue wait, throughput, and oldest-job age |
+| CI/CD test triggers | Production | 2 | Jenkins, GitLab CI, and GitHub Actions use scoped tokens and idempotency keys |
+| Caseflow integration | Production | 2 | Versioned execution API plus signed completion webhooks; databases remain separate |
+| Ephemeral runners | Production + Exercise | 5, 7 | Kubernetes Jobs by default; VM Scale Set/Jenkins agent adapter for VM workloads |
+| Leader election / scheduler coordination | Production + Exercise | 2, 5, 7 | ShedLock + PostgreSQL first; compare Redis locks and Kubernetes Leases under multiple replicas |
 | Idempotency | Production | 1–4B | Consumer check-then-act; Stripe event dedup |
 | Retries | Production | 1–2 | Spring Kafka retry + backoff → DLT |
 | Backpressure | Exercise | 7 | Max concurrent runs per worker; consumer pause |
@@ -636,7 +763,7 @@ spike; Theory = ADR + docs + interview prep (no full implementation required).
 | Hexagonal / ports-adapters | Production | 1+ | `execution` module structure |
 | Feature flags | Exercise | 7 | Toggle flaky detection or AI features per org |
 | gRPC / GraphQL | Exercise | 7 | Optional internal or BFF API experiments |
-| Service mesh (mTLS) | Exercise | 5, 7 | Optional Istio/Linkerd on AKS |
+| Service mesh (mTLS) | Exercise | 5, 7 | Linkerd for service identity/metrics first; optional Istio traffic policy and fault-injection comparison |
 | Bloom filter | Exercise | 7 | Fast “ever flaky?” lookup before DB query; Guava or RedisBloom |
 | Modular monolith boundaries | Production + Exercise | 1, 7 | ArchUnit: no `project` → `execution` illegal imports |
 | API versioning strategy | Production + Theory | 1, 7 | `/api/v1` only until v2 needed; ADR on breaking changes |

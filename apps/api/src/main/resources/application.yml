@@ -6,6 +6,15 @@ spring:
     virtual:
       enabled: true
 
+  task:
+    scheduling:
+      pool:
+        # 5 = tick + dispatch + reaper + webhook-dispatch + environment-health-probe,
+        # each can run for seconds; metrics-refresh (PT10S) + maintenance (PT1H) are
+        # sub-second and queue behind. @SchedulerLock already caps replica-wide
+        # concurrency per job, so more would over-provision (ADR-007 §A4, ADR-008 §3).
+        size: 5
+
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/qualityops}
     username: ${DB_USER:qualityops}
@@ -61,12 +70,126 @@ qualityops:
     refresh-token-expiry-days: ${JWT_REFRESH_EXPIRY:7}
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:8090}
+  artifacts:
+    enabled: ${QUALITYOPS_ARTIFACTS_ENABLED:true}
+    endpoint: ${QUALITYOPS_ARTIFACTS_ENDPOINT:http://localhost:9000}
+    bucket: ${QUALITYOPS_ARTIFACTS_BUCKET:qualityops-artifacts}
+    access-key: ${QUALITYOPS_ARTIFACTS_ACCESS_KEY:qualityops-artifacts-ro}
+    secret-key: ${QUALITYOPS_ARTIFACTS_SECRET_KEY:qualityops-artifacts-ro-secret}
+    region: ${QUALITYOPS_ARTIFACTS_REGION:us-east-1}
+    path-style-access: ${QUALITYOPS_ARTIFACTS_PATH_STYLE:true}
+    presign-ttl: ${QUALITYOPS_ARTIFACTS_PRESIGN_TTL:300s}
+  scheduling:
+    jobs-enabled: ${QUALITYOPS_SCHEDULING_JOBS_ENABLED:true}
+    # tick-interval / dispatch-interval are also read by @Scheduled(fixedDelayString),
+    # which only accepts ISO-8601 or a bare millis count — keep them ISO-8601.
+    tick-interval: ${QUALITYOPS_SCHEDULING_TICK_INTERVAL:PT15S}
+    tick-batch-size: 200
+    fire-ledger-retention: 30d
+    reaper:
+      # read by @Scheduled(fixedDelayString) — ISO-8601 or bare millis only
+      interval: ${QUALITYOPS_SCHEDULING_REAPER_INTERVAL:PT60S}
+      dispatch-grace: PT2M
+      run-timeout: PT30M
+      batch-size: 100
+    retry:
+      enabled: true
+      max-per-run: 2
+      max-active-per-org: 20
+      window: PT1H
+      non-retryable-reason-prefixes:
+        - "execution cancelled"
+        - "run cancelled"
+    environment-health:
+      enabled: true
+      interval: ${QUALITYOPS_ENV_HEALTH_INTERVAL:PT60S}
+      probe-interval: PT5M
+      probe-timeout: PT5S
+      failure-threshold: 3
+      degraded-after: 1
+      batch-size: 50
+      history-retention: P14D
+      allow-private-targets: ${QUALITYOPS_ENV_HEALTH_ALLOW_PRIVATE:false}
+    queue:
+      dispatch-interval: ${QUALITYOPS_SCHEDULING_DISPATCH_INTERVAL:PT2S}
+      dispatch-batch-size: 50
+      max-active-runs-per-org: 5
+      aging-step: 60s
+      aging-max-boost: 20
+      dispatch-max-attempts: 5
+      send-timeout: 10s
+      retention: 90d
+  ci:
+    idempotency-retention: P7D
+  repo-exec:
+    # ADR-009 §12 — API-side subset (the Worker binds the rest). Digest pins are
+    # version-controlled + CODEOWNERS-guarded; the API only freezes the string it
+    # is given into repository_run.runner_image_ref.
+    enabled: ${QUALITYOPS_REPO_EXEC_ENABLED:true}
+    images:
+      # Resolved for real — see infra/compose/runner-images.env (single source
+      # of truth, also feeds CI's Trivy scan matrix). Never hand-edit a digest.
+      playwright: ${QUALITYOPS_REPO_IMAGE_PLAYWRIGHT:mcr.microsoft.com/playwright:v1.55.0-jammy@sha256:55db7b712a981e9cc1ec757a4511cd01c5ed4e20bd7c84b2dee4e1d320102b9d}
+      junit: ${QUALITYOPS_REPO_IMAGE_JUNIT:maven:3.9-eclipse-temurin-21@sha256:8f6ac126f7810bb5549c4cd122d2bf0e9cda5bdeb0838aa928f09e779fd8bef8}
+      pytest: ${QUALITYOPS_REPO_IMAGE_PYTEST:python:3.12-slim@sha256:78387bc3881b8273120a12ebe6c1ab22b018ccc2c9adf565ae1ac9b536e184ea}
+      cypress: ${QUALITYOPS_REPO_IMAGE_CYPRESS:cypress/included:13.15.0@sha256:d2123cf33edc48d3e3f30bd24231459ca5291dcf66b91b0b30b50ffe568eb707}
+      k6: ${QUALITYOPS_REPO_IMAGE_K6:grafana/k6:0.54.0@sha256:1f40432b1cbe7234e977f96c362c9bc550a2d2b583d014dd8669fe40d3e9e755}
+    default-run-timeout: PT10M
+    max-run-timeout: PT30M
+    default-resource-profile: SMALL
+    persist-report-snippets: ${QUALITYOPS_REPO_PERSIST_REPORT_SNIPPETS:false}
+    scm:
+      allowed-hosts: ${QUALITYOPS_SCM_ALLOWED_HOSTS:github.com,gitlab.com}
+      allow-private-hosts: ${QUALITYOPS_SCM_ALLOW_PRIVATE_HOSTS:false}
+      http-timeout: PT10S
+      ref-resolve-timeout: PT15S
+      credential-env-prefix: ${QUALITYOPS_SCM_CREDENTIAL_ENV_PREFIX:QUALITYOPS_SCM_CREDENTIAL_}
+      credential-file: ${QUALITYOPS_SCM_CREDENTIAL_FILE:}
+      # Blank => derived from the connection host (ADR-009 §4); set for GitHub
+      # Enterprise / GitLab self-managed / integration tests.
+      github-api-base: ${QUALITYOPS_SCM_GITHUB_API_BASE:}
+      gitlab-api-base: ${QUALITYOPS_SCM_GITLAB_API_BASE:}
+  webhook:
+    enabled: true
+    # read by @Scheduled(fixedDelayString) — ISO-8601 only
+    dispatch-interval: ${QUALITYOPS_WEBHOOK_DISPATCH_INTERVAL:PT10S}
+    # batch-size * request-timeout must stay well under the webhook-dispatch
+    # ShedLock lockAtMostFor (PT5M) so a batch of dead endpoints cannot outlast
+    # the lease: 20 * 10s = 200s < 300s.
+    batch-size: 20
+    max-attempts: 6
+    connect-timeout: PT5S
+    request-timeout: PT10S
+    initial-backoff: PT30S
+    delivery-retention: P7D
+    replay-window: PT5M   # receiver guidance only — sender just stamps X-QualityOps-Timestamp
+  analytics:
+    flaky: { window-size: 20, min-runs: 5 }
+    slow:  { default-limit: 20 }
+    trends: { max-days: 90 }
+  cache:
+    enabled: ${QUALITYOPS_CACHE_ENABLED:true}
+    dashboard-ttl: PT30S
+  ws:
+    enabled: ${QUALITYOPS_WS_ENABLED:true}
+    redis-channel: qualityops:ws:runs
+    allowed-origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:8090}
+  ratelimit:
+    enabled: ${QUALITYOPS_RATELIMIT_ENABLED:true}
+    fail-open: true
+    run-trigger: { limit: 60, window: PT1H }
+    ci-run:      { limit: 120, window: PT1H }
+    scm-test:    { limit: 30, window: PT1H }
+  audit:
+    enabled: ${QUALITYOPS_AUDIT_ENABLED:true}
+  timing:
+    slow-threshold-ms: 1000
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       show-details: when-authorized

@@ -1,5 +1,7 @@
 package com.qualityops.api.project.application.service;
 
+import com.qualityops.api.audit.annotation.Audited;
+import com.qualityops.api.audit.domain.AuditAction;
 import com.qualityops.api.common.PageResult;
 import com.qualityops.api.project.application.port.in.CreateProjectUseCase;
 import com.qualityops.api.project.application.port.in.DeleteProjectUseCase;
@@ -93,6 +95,7 @@ public class ProjectService implements CreateProjectUseCase, ListProjectsUseCase
     }
 
     @Override
+    @Audited(action = AuditAction.PROJECT_DELETE, targetType = "project")
     public void delete(UUID id, UUID orgId) {
         getDomain(id, orgId);
         projectRepository.softDelete(id, orgId, Instant.now());

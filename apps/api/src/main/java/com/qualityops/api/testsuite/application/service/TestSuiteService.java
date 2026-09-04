@@ -1,5 +1,7 @@
 package com.qualityops.api.testsuite.application.service;
 
+import com.qualityops.api.audit.annotation.Audited;
+import com.qualityops.api.audit.domain.AuditAction;
 import com.qualityops.api.common.PageResult;
 import com.qualityops.api.project.application.port.in.GetProjectUseCase;
 import com.qualityops.api.testsuite.application.port.in.CreateTestSuiteUseCase;
@@ -98,6 +100,7 @@ public class TestSuiteService implements CreateTestSuiteUseCase, ListTestSuitesU
     }
 
     @Override
+    @Audited(action = AuditAction.TEST_SUITE_DELETE, targetType = "test_suite")
     public void delete(UUID id, UUID orgId) {
         getDomain(id, orgId);
         testSuiteRepository.softDelete(id, orgId, Instant.now());

@@ -1,0 +1,177 @@
+spring:
+  application:
+    name: qualityops-worker
+
+  threads:
+    virtual:
+      enabled: true
+
+  task:
+    scheduling:
+      pool:
+        # AttemptRetentionSweeper + BrowserArtifactSweeper + ArtifactStagingSweeper
+        # + RepoContainerSweeper (ADR-009 §9). Each is sub-second/low-frequency.
+        size: 4
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/qualityops}
+    username: ${DB_USER:qualityops}
+    password: ${DB_PASSWORD:qualityops}
+    driver-class-name: org.postgresql.Driver
+
+  flyway:
+    enabled: true
+    locations: classpath:db/worker-migration
+    schemas: worker
+    default-schema: worker
+    create-schemas: true
+
+  sql:
+    init:
+      mode: never
+
+  kafka:
+    bootstrap-servers: ${KAFKA_SERVERS:localhost:29092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: true
+    consumer:
+      group-id: worker-execution
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.qualityops.*"
+
+server:
+  port: ${SERVER_PORT:8081}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState,db
+
+qualityops:
+  worker:
+    execution:
+      mode: ${WORKER_EXECUTION_MODE:auto}
+      default-request-timeout: 10s
+      max-timeout: 30s
+      connect-timeout: 5s
+      max-response-bytes: 1048576
+      response-body-sample-bytes: 4096
+      run-wall-clock-budget: 5m
+      claim-lease: 2m
+      attempt-retention: 14d
+      # Bounded in-memory cancel-signal registry keyed by executionId (ADR-006 §5.4)
+      cancel-registry-max: ${WORKER_CANCEL_REGISTRY_MAX:10000}
+      follow-redirects: false
+      ssrf:
+        allow-private-targets: ${WORKER_SSRF_ALLOW_PRIVATE:false}
+        allowed-hosts: ${WORKER_SSRF_ALLOWED_HOSTS:}
+        allowed-ports: 80,443,8080
+      redaction:
+        header-denylist: authorization,cookie,set-cookie,proxy-authorization,x-api-key
+        body-patterns:
+          - "(?i)bearer\\s+[A-Za-z0-9._~+/-]+=*"
+          - "eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+"
+          - "AKIA[0-9A-Z]{16}"
+          - "-----BEGIN [A-Z ]*PRIVATE KEY-----"
+          - "(?i)\"?password\"?\\s*[:=]\\s*\"?[^\"\\s,}]+"
+      persist-body-snippets: false
+      browser:
+        enabled: true
+        headless: true
+        test-timeout: 60s
+        max-test-timeout: 3m
+        step-timeout: 15s
+        navigation-timeout: 30s
+        launch-timeout: 30s
+        hard-kill-grace: 5s
+        capture-trace: false
+        screenshot-on-failure: true
+        block-private-subresources: true
+        artifact-temp-dir: ${java.io.tmpdir}/qualityops-browser
+        artifact-max-bytes: 5242880
+        artifact-retention: 1h
+      artifacts:
+        enabled: ${WORKER_ARTIFACTS_ENABLED:true}
+        endpoint: ${QUALITYOPS_ARTIFACTS_ENDPOINT:http://localhost:9000}
+        bucket: ${QUALITYOPS_ARTIFACTS_BUCKET:qualityops-artifacts}
+        access-key: ${QUALITYOPS_ARTIFACTS_ACCESS_KEY:qualityops}
+        secret-key: ${QUALITYOPS_ARTIFACTS_SECRET_KEY:qualityops-dev-secret}
+        region: ${QUALITYOPS_ARTIFACTS_REGION:us-east-1}
+        sse: ${QUALITYOPS_ARTIFACTS_SSE:S3}
+        path-style-access: ${QUALITYOPS_ARTIFACTS_PATH_STYLE:true}
+        upload-timeout: 10s
+        max-artifact-bytes: 10485760
+        retention-days: ${QUALITYOPS_ARTIFACTS_RETENTION_DAYS:30}
+        staging-dir: ${java.io.tmpdir}/qualityops-artifact-staging
+        staging-retention: 2h
+        bootstrap-enabled: ${WORKER_ARTIFACTS_BOOTSTRAP_ENABLED:true}
+        upload-secret-cases: ${WORKER_ARTIFACTS_UPLOAD_SECRET_CASES:false}
+      retry:
+        enabled: ${WORKER_RETRY_ENABLED:true}
+        max-attempts: ${WORKER_RETRY_MAX_ATTEMPTS:2}
+        retryable-statuses: TIMEOUT,ERROR
+        backoff: 0s
+      secrets:
+        env-prefix: QUALITYOPS_SECRET_
+        file: ${QUALITYOPS_SECRETS_FILE:}
+  # ADR-009 §12 — repository-owned framework execution (Worker subset). Digest
+  # pins are version-controlled + CODEOWNERS-guarded (WP9 runner-images.env);
+  # the placeholders below keep the ref format valid until then.
+  repo-exec:
+    enabled: ${QUALITYOPS_REPO_EXEC_ENABLED:true}
+    images:
+      # Resolved for real — see infra/compose/runner-images.env (single source
+      # of truth, also feeds CI's Trivy scan matrix). Never hand-edit a digest.
+      playwright: ${QUALITYOPS_REPO_IMAGE_PLAYWRIGHT:mcr.microsoft.com/playwright:v1.55.0-jammy@sha256:55db7b712a981e9cc1ec757a4511cd01c5ed4e20bd7c84b2dee4e1d320102b9d}
+      junit: ${QUALITYOPS_REPO_IMAGE_JUNIT:maven:3.9-eclipse-temurin-21@sha256:8f6ac126f7810bb5549c4cd122d2bf0e9cda5bdeb0838aa928f09e779fd8bef8}
+      pytest: ${QUALITYOPS_REPO_IMAGE_PYTEST:python:3.12-slim@sha256:78387bc3881b8273120a12ebe6c1ab22b018ccc2c9adf565ae1ac9b536e184ea}
+      cypress: ${QUALITYOPS_REPO_IMAGE_CYPRESS:cypress/included:13.15.0@sha256:d2123cf33edc48d3e3f30bd24231459ca5291dcf66b91b0b30b50ffe568eb707}
+      k6: ${QUALITYOPS_REPO_IMAGE_K6:grafana/k6:0.54.0@sha256:1f40432b1cbe7234e977f96c362c9bc550a2d2b583d014dd8669fe40d3e9e755}
+      checkout: ${QUALITYOPS_REPO_IMAGE_CHECKOUT:alpine/git:2.45.2@sha256:16ad8e788e1d3b0c30f18da8dde5c0ace3b187445a62d8af893b003ca1e70592}
+    image-pull-on-startup: ${QUALITYOPS_REPO_IMAGE_PULL_ON_STARTUP:true}
+    default-run-timeout: PT10M
+    max-run-timeout: PT30M
+    default-resource-profile: SMALL
+    docker:
+      host: ${DOCKER_HOST:unix:///var/run/docker.sock}
+      require-proxy: ${REPO_EXEC_REQUIRE_PROXY:false}
+    container:
+      runner-uid: 12000
+      runner-gid: 12000
+      pids-limit: 512
+      tmpfs-mb: 256
+      max-workspace-mb: 2048
+      workspace-watchdog: PT5S
+      nofile-soft: 4096
+      nofile-hard: 8192
+    network:
+      isolated-mode: none
+      egress-network: qualityops-runner-egress
+    resource-profiles:
+      small: { cpus: 1, memory-mb: 1024 }
+      medium: { cpus: 2, memory-mb: 2048 }
+      large: { cpus: 4, memory-mb: 4096 }
+    workspace-root: ${QUALITYOPS_REPO_WORKSPACE_ROOT:${java.io.tmpdir}/qualityops-repo-workspace}
+    max-report-bytes: 20971520
+    max-item-message-bytes: 4096
+    persist-report-snippets: ${QUALITYOPS_REPO_PERSIST_REPORT_SNIPPETS:false}
+    upload-secret-run-artifacts: ${QUALITYOPS_REPO_UPLOAD_SECRET_RUN_ARTIFACTS:false}
+    cancel-poll: PT2S
+    hard-kill-grace: PT5S
+    container-sweep-interval: PT10M
+    secret-env-prefix: QUALITYOPS_SECRET_

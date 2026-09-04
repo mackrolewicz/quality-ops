@@ -1,0 +1,255 @@
+openapi: 3.1.0
+info:
+  title: QualityOps Caseflow
+  version: 1.0.0
+  description: >
+    The versioned external contract for CI systems driving QualityOps test runs.
+    Caseflow is a documented contract over endpoints that already exist (plus the
+    2D idempotent CI submit) — there is no parallel /api/v1/caseflow/* surface.
+    Signed completion webhooks let CI stop polling (ADR-007 §6).
+
+servers:
+  - url: https://qualityops.example.com
+
+security:
+  - bearerAuth: []
+
+paths:
+  /api/v1/ci/runs:
+    post:
+      operationId: submitCaseflowRun
+      summary: Enqueue a run from CI, idempotent per Idempotency-Key
+      tags: [Caseflow]
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            pattern: '^[A-Za-z0-9_.\-]{1,200}$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRunRequest'
+      responses:
+        '200':
+          description: >
+            The run — returned on the first call AND every subsequent
+            same-key+same-body call.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunResponseEnvelope'
+        '400':
+          description: VALIDATION_ERROR — missing/blank/oversize Idempotency-Key or invalid body
+        '403':
+          description: FORBIDDEN — role below MEMBER, or priority=HIGH without OWNER/ADMIN
+        '409':
+          description: IDEMPOTENCY_KEY_CONFLICT — same key, different request fingerprint
+
+  /api/v1/runs/{id}:
+    get:
+      operationId: getRun
+      summary: Get a run's status (queueState, priority, cancelRequested, retryOf, retryCount)
+      tags: [Caseflow]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The run
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunResponseEnvelope'
+        '404':
+          description: RUN_NOT_FOUND
+
+  /api/v1/runs/{id}/cancel:
+    post:
+      operationId: cancelRun
+      summary: Cancel a queued or in-flight run
+      tags: [Caseflow]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Cancelled while QUEUED — guaranteed, never executed
+        '202':
+          description: Cooperative cancel requested for a DISPATCHED/RUNNING run
+        '409':
+          description: RUN_NOT_CANCELLABLE — already terminal or no such run
+
+  /api/v1/runs/{id}/results:
+    get:
+      operationId: listRunResults
+      summary: List per-case results for a run (paged)
+      tags: [Caseflow]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        '200':
+          description: Paged TestResultResponse list
+
+  /api/v1/runs/{id}/artifacts:
+    get:
+      operationId: listRunArtifacts
+      summary: List durable artifacts (screenshots/traces) for a run
+      tags: [Caseflow]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: ArtifactReference array (presigned GET URLs)
+
+webhooks:
+  runCompleted:
+    post:
+      operationId: receiveRunCompletedWebhook
+      summary: Signed run-completion notification delivered to a registered endpoint
+      parameters:
+        - name: X-QualityOps-Event
+          in: header
+          required: true
+          schema: { type: string, enum: [run.completed, run.failed] }
+        - name: X-QualityOps-Delivery
+          in: header
+          required: true
+          schema: { type: string, format: uuid }
+        - name: X-QualityOps-Timestamp
+          in: header
+          required: true
+          schema: { type: integer, description: epoch seconds }
+        - name: X-QualityOps-Signature
+          in: header
+          required: true
+          schema:
+            type: string
+            description: 'sha256= + hex(HMAC-SHA256(endpoint.secret, "<timestamp>.<body>"))'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RunCompletedWebhook'
+      responses:
+        '2XX':
+          description: Any 2xx marks the delivery DELIVERED; otherwise it is retried with backoff.
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    CreateRunRequest:
+      type: object
+      required: [projectId, suiteId, environmentId]
+      properties:
+        projectId: { type: string, format: uuid }
+        suiteId: { type: string, format: uuid }
+        environmentId: { type: string, format: uuid }
+        priority: { type: string, enum: [HIGH, NORMAL, LOW] }
+
+    RunResponseEnvelope:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/RunResponse'
+
+    RunResponse:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        suiteId: { type: string, format: uuid }
+        environmentId: { type: string, format: uuid }
+        status: { type: string, enum: [PENDING, RUNNING, PASSED, FAILED, CANCELLED] }
+        triggeredBy: { type: string, format: uuid }
+        startedAt: { type: [string, 'null'], format: date-time }
+        completedAt: { type: [string, 'null'], format: date-time }
+        createdAt: { type: string, format: date-time }
+        queueState:
+          type: [string, 'null']
+          enum: [QUEUED, DISPATCHED, RUNNING, COMPLETED, FAILED, CANCELLED, null]
+        priority: { type: [string, 'null'], enum: [HIGH, NORMAL, LOW, null] }
+        cancelRequested: { type: [boolean, 'null'] }
+        retryOf: { type: [string, 'null'], format: uuid }
+        retryCount: { type: [integer, 'null'] }
+        repositoryRun:
+          oneOf:
+            - $ref: '#/components/schemas/RepositoryRun'
+            - type: 'null'
+
+    # ADR-009 §11 — additive-nullable; only present when the run carries a
+    # repository test case. A suite-authored repo case runs through the SAME
+    # submitCaseflowRun / getRun / cancelRun / listRunResults operations above —
+    # there is no separate Caseflow operation for repository runs.
+    RepositoryRun:
+      type: object
+      properties:
+        provider: { type: string, enum: [GITHUB, GITLAB] }
+        repoPath: { type: string }
+        requestedRef: { type: string }
+        commitSha: { type: string }
+        refType: { type: string, enum: [BRANCH, TAG, COMMIT] }
+        framework: { type: string, enum: [PLAYWRIGHT, JUNIT, PYTEST, CYPRESS, K6] }
+        state: { type: string, enum: [PENDING, RUNNING, COMPLETED, FAILED, CANCELLED] }
+        runnerImageDigest: { type: [string, 'null'] }
+        containerExitCode: { type: [integer, 'null'] }
+        itemsTotal: { type: [integer, 'null'] }
+        itemsPassed: { type: [integer, 'null'] }
+        itemsFailed: { type: [integer, 'null'] }
+        itemsSkipped: { type: [integer, 'null'] }
+        checkoutAt: { type: [string, 'null'], format: date-time }
+        startedAt: { type: [string, 'null'], format: date-time }
+        finishedAt: { type: [string, 'null'], format: date-time }
+
+    RunCompletedWebhook:
+      type: object
+      required: [event, runId, projectId, suiteId, environmentId, status, links]
+      properties:
+        event: { type: string, enum: [run.completed, run.failed] }
+        runId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        suiteId: { type: string, format: uuid }
+        environmentId: { type: string, format: uuid }
+        status: { type: string, enum: [PASSED, FAILED] }
+        startedAt: { type: [string, 'null'], format: date-time }
+        completedAt: { type: [string, 'null'], format: date-time }
+        triggeredBy: { type: string, format: uuid }
+        links:
+          type: object
+          properties:
+            self: { type: string }
+            results: { type: string }
+            artifacts: { type: string }

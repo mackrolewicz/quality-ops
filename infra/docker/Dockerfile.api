@@ -6,14 +6,17 @@ WORKDIR /workspace
 
 # Copy POMs before source to exploit Docker layer caching:
 # dependency downloads are re-used as long as pom files are unchanged.
-COPY pom.xml               ./
-COPY apps/api/pom.xml      apps/api/
-COPY apps/gateway/pom.xml  apps/gateway/
-RUN mvn -B -pl apps/api dependency:go-offline -q
+COPY pom.xml                        ./
+COPY packages/shared-events/pom.xml packages/shared-events/
+COPY apps/api/pom.xml               apps/api/
+COPY apps/worker/pom.xml            apps/worker/
+COPY apps/gateway/pom.xml           apps/gateway/
+RUN mvn -B -pl apps/api -am dependency:go-offline -q
 
 # Copy source and produce the executable fat JAR.
-COPY apps/api/src apps/api/src
-RUN mvn -B -pl apps/api package -DskipTests -q
+COPY packages/shared-events/src     packages/shared-events/src
+COPY apps/api/src                   apps/api/src
+RUN mvn -B -pl apps/api -am package -DskipTests -q
 
 # ── Runtime stage ──────────────────────────────────────────────────────────────
 FROM eclipse-temurin:21-jre-alpine AS runtime

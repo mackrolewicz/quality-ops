@@ -1,7 +1,7 @@
 package com.qualityops.api.result.adapter.in.messaging;
 
-import com.qualityops.api.execution.event.RunCompletedEvent;
 import com.qualityops.api.result.application.port.in.GenerateResultsUseCase;
+import com.qualityops.events.RunCompletedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;

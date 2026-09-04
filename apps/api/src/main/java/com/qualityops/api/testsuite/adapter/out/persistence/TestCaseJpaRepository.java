@@ -24,6 +24,13 @@ interface TestCaseJpaRepository extends JpaRepository<TestCaseEntity, UUID> {
         "WHERE c.suiteId = :suiteId AND c.orgId = :orgId AND c.deletedAt IS NULL")
     Optional<Integer> findMaxOrderIndexBySuiteId(@Param("suiteId") UUID suiteId, @Param("orgId") UUID orgId);
 
+    // ADR-009 §11 — native: repo_test is a jsonb column; ->> extracts the
+    // connection id as text for the referenced-by-any-case delete guard.
+    @Query(value = "SELECT count(*) FROM test_cases WHERE org_id = :orgId AND deleted_at IS NULL "
+        + "AND repo_test IS NOT NULL AND repo_test ->> 'repositoryConnectionId' = :connectionId",
+        nativeQuery = true)
+    long countReferencingConnection(@Param("orgId") UUID orgId, @Param("connectionId") String connectionId);
+
     @Modifying
     @Query("UPDATE TestCaseEntity c SET c.deletedAt = :deletedAt, c.updatedAt = :deletedAt " +
         "WHERE c.id = :id AND c.orgId = :orgId")

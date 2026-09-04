@@ -20,7 +20,9 @@
   <description>QualityOps Lab — AI-native QA Platform</description>
 
   <modules>
+    <module>packages/shared-events</module>
     <module>apps/api</module>
+    <module>apps/worker</module>
     <module>apps/gateway</module>
   </modules>
 
@@ -30,10 +32,41 @@
     <jjwt.version>0.12.6</jjwt.version>
     <testcontainers.version>1.19.8</testcontainers.version>
     <springdoc.version>2.5.0</springdoc.version>
+    <playwright.version>1.55.0</playwright.version>
+    <minio.version>8.5.17</minio.version>
+    <shedlock.version>5.16.0</shedlock.version>
+    <dependency-check-maven.version>10.0.4</dependency-check-maven.version>
+    <!-- ADR-009 §1/§12 — the Docker Remote API client for the repository-run
+         `ContainerRunnerPort` (apps/worker only). Pinned to the exact version
+         Testcontainers 1.19.8 already brings transitively, so the transport and
+         API surface are proven. -->
+    <docker-java.version>3.3.6</docker-java.version>
   </properties>
 
   <dependencyManagement>
     <dependencies>
+      <dependency>
+        <groupId>com.qualityops</groupId>
+        <artifactId>qualityops-shared-events</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.microsoft.playwright</groupId>
+        <artifactId>playwright</artifactId>
+        <version>${playwright.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.minio</groupId>
+        <artifactId>minio</artifactId>
+        <version>${minio.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>net.javacrumbs.shedlock</groupId>
+        <artifactId>shedlock-bom</artifactId>
+        <version>${shedlock.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
       <dependency>
         <groupId>org.springframework.cloud</groupId>
         <artifactId>spring-cloud-dependencies</artifactId>
@@ -45,6 +78,13 @@
         <groupId>org.testcontainers</groupId>
         <artifactId>testcontainers-bom</artifactId>
         <version>${testcontainers.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.github.docker-java</groupId>
+        <artifactId>docker-java-bom</artifactId>
+        <version>${docker-java.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -64,5 +104,42 @@
       </plugins>
     </pluginManagement>
   </build>
+
+  <profiles>
+    <!-- ADR-008 §9: opt-in only. NOT part of the default reactor build — the first
+         run downloads the multi-minute NVD database. Run with `mvn -Psecurity-scan`.
+         `mvn verify` (the 4-module gate) must never trigger it. -->
+    <profile>
+      <id>security-scan</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.owasp</groupId>
+            <artifactId>dependency-check-maven</artifactId>
+            <version>${dependency-check-maven.version}</version>
+            <configuration>
+              <failBuildOnCVSS>7</failBuildOnCVSS>
+              <formats>
+                <format>HTML</format>
+                <format>SARIF</format>
+              </formats>
+              <suppressionFiles>
+                <suppressionFile>${maven.multiModuleProjectDirectory}/.github/dependency-check-suppressions.xml</suppressionFile>
+              </suppressionFiles>
+              <nvdApiKeyEnvironmentVariable>NVD_API_KEY</nvdApiKeyEnvironmentVariable>
+            </configuration>
+            <executions>
+              <execution>
+                <goals>
+                  <goal>check</goal>
+                </goals>
+                <phase>verify</phase>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 
 </project>

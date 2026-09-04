@@ -41,6 +41,9 @@ class TestResultEntity {
     @Column(name = "retry_count", nullable = false)
     private int retryCount;
 
+    @Column(name = "attempt_epoch", nullable = false)
+    private int attemptEpoch;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -85,12 +88,17 @@ class TestResultEntity {
         return retryCount;
     }
 
+    int getAttemptEpoch() {
+        return attemptEpoch;
+    }
+
     Instant getCreatedAt() {
         return createdAt;
     }
 
     static TestResultEntity create(UUID id, UUID orgId, UUID runId, UUID testCaseId, ResultStatus status,
-                                    int durationMs, String errorMessage, int retryCount, Instant createdAt) {
+                                    int durationMs, String errorMessage, int retryCount, int attemptEpoch,
+                                    Instant createdAt) {
         var entity = new TestResultEntity();
         entity.id = id;
         entity.orgId = orgId;
@@ -100,6 +108,7 @@ class TestResultEntity {
         entity.durationMs = durationMs;
         entity.errorMessage = errorMessage;
         entity.retryCount = retryCount;
+        entity.attemptEpoch = attemptEpoch;
         entity.createdAt = createdAt;
         return entity;
     }

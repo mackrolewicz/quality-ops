@@ -9,7 +9,40 @@ spring:
 
   cloud:
     gateway:
+      # Browser calls the gateway cross-origin (React dev server / container on :5173).
+      # Handle the CORS preflight here so it never reaches the rate limiter or a route
+      # that would 403 it. DedupeResponseHeader keeps a single CORS header when the
+      # downstream API also emits one.
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_FIRST
+        - SecureHeaders
+        - AddResponseHeader=Permissions-Policy, "camera=(), microphone=(), geolocation=()"
+      # SecureHeadersProperties in spring-cloud 2023.0.3 (gateway-server 4.1.5)
+      # has no permissions-policy key, so that header is set via AddResponseHeader
+      # above. x-content-type-options / x-frame-options / x-xss-protection are
+      # disabled here; framing is covered by the CSP frame-ancestors directive.
+      filter:
+        secure-headers:
+          disable: [x-content-type-options, x-frame-options, x-xss-protection]
+          strict-transport-security: "max-age=31536000; includeSubDomains"
+          content-security-policy: "default-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'"
+          referrer-policy: "strict-origin-when-cross-origin"
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:8090}
+            allowedMethods: [GET, POST, PUT, DELETE, OPTIONS]
+            allowedHeaders: [Authorization, Content-Type]
+            allowCredentials: true
+            maxAge: 3600
       routes:
+        # More specific first. The WebSocket upgrade must not carry a
+        # RequestRateLimiter — a long-lived STOMP/SockJS connection would otherwise
+        # burn rate tokens for its whole lifetime (ADR-008 §5).
+        - id: ws-route
+          uri: ${API_URL:http://localhost:8080}
+          predicates:
+            - Path=/ws/**
         - id: api-route
           uri: ${API_URL:http://localhost:8080}
           predicates:

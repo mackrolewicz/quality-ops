@@ -28,6 +28,9 @@ class RunEntity {
     @Column(name = "environment_id", nullable = false)
     private UUID environmentId;
 
+    @Column(name = "execution_id", nullable = false, updatable = false)
+    private UUID executionId;
+
     // @JdbcTypeCode(NAMED_ENUM) tells Hibernate 6 this is a PostgreSQL named enum,
     // preventing a type-mismatch during ddl-auto:validate.
     @Enumerated(EnumType.STRING)
@@ -82,6 +85,10 @@ class RunEntity {
         return environmentId;
     }
 
+    UUID getExecutionId() {
+        return executionId;
+    }
+
     RunStatus getStatus() {
         return status;
     }
@@ -107,7 +114,7 @@ class RunEntity {
     }
 
     static RunEntity create(UUID id, UUID orgId, UUID projectId, UUID suiteId, UUID environmentId,
-                             RunStatus status, UUID triggeredBy, String configSnapshotJson,
+                             UUID executionId, RunStatus status, UUID triggeredBy, String configSnapshotJson,
                              Instant startedAt, Instant completedAt, Instant createdAt) {
         var entity = new RunEntity();
         entity.id = id;
@@ -115,6 +122,7 @@ class RunEntity {
         entity.projectId = projectId;
         entity.suiteId = suiteId;
         entity.environmentId = environmentId;
+        entity.executionId = executionId;
         entity.status = status;
         entity.triggeredBy = triggeredBy;
         entity.configSnapshotJson = configSnapshotJson;
