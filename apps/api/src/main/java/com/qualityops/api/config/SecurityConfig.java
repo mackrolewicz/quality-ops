@@ -43,6 +43,9 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/actuator/health/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/auth/login", "/auth/refresh").permitAll()
+                // SockJS /ws/info + transport handshake must be reachable unauthenticated;
+                // the STOMP CONNECT frame does the real JWT auth (ADR-008 §5).
+                .requestMatchers("/ws/**").permitAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)

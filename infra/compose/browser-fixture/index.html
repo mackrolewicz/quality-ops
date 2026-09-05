@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>QualityOps browser fixture</title></head>
+<body>
+  <label for="email">Email</label>
+  <input id="email" name="email" type="email">
+  <button id="go" type="button"
+          onclick="document.getElementById('msg').style.display='block'">Go</button>
+  <a id="home" href="/home.html">Home</a>
+  <select id="opt">
+    <option value="opt1">One</option>
+    <option value="opt2">Two</option>
+  </select>
+  <div data-testid="msg" style="display:none">Saved</div>
+</body>
+</html>

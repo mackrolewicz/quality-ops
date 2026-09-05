@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.qualityops</groupId>
+    <artifactId>qualityops-parent</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <relativePath>../../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>qualityops-worker</artifactId>
+  <name>QualityOps Worker</name>
+  <description>Database-free Kafka worker — consumes runs.requested, publishes run lifecycle events</description>
+
+  <properties>
+    <playwright.install.skip>false</playwright.install.skip>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.qualityops</groupId>
+      <artifactId>qualityops-shared-events</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.microsoft.playwright</groupId>
+      <artifactId>playwright</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.minio</groupId>
+      <artifactId>minio</artifactId>
+    </dependency>
+    <!-- ADR-009 §1/§13 — Docker Remote API client for the repository-run
+         ContainerRunnerPort. BOM-managed (root pom, pinned to Testcontainers'
+         transitive 3.3.6). Swappable — the port is the Phase-5 k8s seam.
+         NOTE (WP7 spike, thread-dump-confirmed): `POST /containers/create` for
+         a container whose HostConfig includes a Bind (every real runner call)
+         hangs daemon-side over Docker Desktop's Windows named pipe on this dev
+         box, with both httpclient5 and zerodep transports and regardless of
+         whether the bind-mount source directory already exists — a create
+         WITHOUT a bind mount succeeds normally. This isolates the bind mount as
+         the trigger; it is an environment/daemon limitation, not a transport or
+         DockerContainerRunner bug. Unaffected on Linux (unix socket) where the
+         @Tag("docker") ITs run for real — CI. AbstractDockerRunnerIT bounds the
+         whole daemon bootstrap and skips the class locally when this reproduces,
+         rather than hanging the build. -->
+    <dependency>
+      <groupId>com.github.docker-java</groupId>
+      <artifactId>docker-java-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.github.docker-java</groupId>
+      <artifactId>docker-java-transport-httpclient5</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.kafka</groupId>
+      <artifactId>spring-kafka</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-jdbc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-database-postgresql</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.kafka</groupId>
+      <artifactId>spring-kafka-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.awaitility</groupId>
+      <artifactId>awaitility</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.squareup.okhttp3</groupId>
+      <artifactId>mockwebserver</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>minio</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+      <!-- spring-boot-starter-parent only plugin-manages surefire; declare it so
+           **/*IT.java run ONLY in failsafe, never in the unit phase. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <excludes>
+            <exclude>**/*IT.java</exclude>
+          </excludes>
+        </configuration>
+      </plugin>
+      <!-- spring-boot-starter-parent only plugin-manages failsafe; declare it so
+           **/*IT.java integration tests run during `mvn verify`. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-failsafe-plugin</artifactId>
+        <executions>
+          <execution>
+            <goals>
+              <goal>integration-test</goal>
+              <goal>verify</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <includes>
+            <include>**/*IT.java</include>
+          </includes>
+        </configuration>
+      </plugin>
+      <!-- Downloads the Chromium bundle Playwright needs for the @Tag("browser")
+           integration tests. Bound to pre-integration-test so it runs on `verify`
+           unless skipped with -Dplaywright.install.skip=true (P3/P4 checkpoints, CI backend job).
+           Uses the `exec` goal (separate JVM): com.microsoft.playwright.CLI calls
+           System.exit(), which would kill the whole Maven build under the in-process `java` goal. -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>3.5.0</version>
+        <executions>
+          <execution>
+            <id>install-playwright-chromium</id>
+            <phase>pre-integration-test</phase>
+            <goals><goal>exec</goal></goals>
+            <configuration>
+              <skip>${playwright.install.skip}</skip>
+              <executable>${java.home}/bin/java</executable>
+              <classpathScope>test</classpathScope>
+              <arguments>
+                <argument>-classpath</argument>
+                <classpath/>
+                <argument>com.microsoft.playwright.CLI</argument>
+                <argument>install</argument>
+                <argument>chromium</argument>
+              </arguments>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

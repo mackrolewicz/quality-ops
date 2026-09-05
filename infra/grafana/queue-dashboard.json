@@ -1,0 +1,167 @@
+{
+  "__inputs": [],
+  "__requires": [],
+  "annotations": { "list": [] },
+  "editable": true,
+  "graphTooltip": 0,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "tags": ["qualityops"],
+  "title": "QualityOps — Queue, Scheduling, Reaper, Retry & Webhooks",
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {},
+        "hide": 0,
+        "label": "Data source"
+      },
+      {
+        "name": "instance",
+        "type": "query",
+        "datasource": "${datasource}",
+        "query": "label_values(up, instance)",
+        "multi": true,
+        "includeAll": true,
+        "refresh": 2,
+        "label": "Instance"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "row", "title": "Queue", "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+    {
+      "type": "timeseries", "title": "Queue depth by priority",
+      "datasource": "${datasource}",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 1 },
+      "targets": [
+        { "expr": "qualityops_queue_depth{instance=~\"$instance\"}", "legendFormat": "{{priority}}" }
+      ]
+    },
+    {
+      "type": "stat", "title": "Oldest queued age (s)",
+      "datasource": "${datasource}",
+      "gridPos": { "h": 8, "w": 4, "x": 8, "y": 1 },
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute",
+        "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 300 } ] } } },
+      "targets": [ { "expr": "qualityops_queue_oldest_age_seconds{instance=~\"$instance\"}" } ]
+    },
+    {
+      "type": "stat", "title": "Active runs",
+      "datasource": "${datasource}",
+      "gridPos": { "h": 8, "w": 4, "x": 12, "y": 1 },
+      "targets": [ { "expr": "qualityops_queue_active_runs{instance=~\"$instance\"}" } ]
+    },
+    {
+      "type": "timeseries", "title": "Queue wait seconds (p50/p95/p99)",
+      "datasource": "${datasource}",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 1 },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum(rate(qualityops_queue_wait_seconds_bucket{instance=~\"$instance\"}[5m])) by (le))", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.95, sum(rate(qualityops_queue_wait_seconds_bucket{instance=~\"$instance\"}[5m])) by (le))", "legendFormat": "p95" },
+        { "expr": "histogram_quantile(0.99, sum(rate(qualityops_queue_wait_seconds_bucket{instance=~\"$instance\"}[5m])) by (le))", "legendFormat": "p99" }
+      ]
+    },
+    {
+      "type": "heatmap", "title": "Queue wait seconds heatmap",
+      "datasource": "${datasource}",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 9 },
+      "targets": [ { "expr": "sum(rate(qualityops_queue_wait_seconds_bucket{instance=~\"$instance\"}[5m])) by (le)", "format": "heatmap" } ]
+    },
+    {
+      "type": "timeseries", "title": "Dispatch throughput (rate)",
+      "datasource": "${datasource}",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 9 },
+      "targets": [ { "expr": "rate(qualityops_queue_dispatch_throughput_total{instance=~\"$instance\"}[5m])" } ]
+    },
+    {
+      "type": "timeseries", "title": "Dispatch failed by reason",
+      "datasource": "${datasource}",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 9 },
+      "targets": [ { "expr": "qualityops_queue_dispatch_failed_total{instance=~\"$instance\"}", "legendFormat": "{{reason}}" } ]
+    },
+
+    {
+      "type": "row", "title": "Scheduling", "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 }
+    },
+    {
+      "type": "timeseries", "title": "Schedule fires by outcome",
+      "datasource": "${datasource}",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 18 },
+      "targets": [ { "expr": "qualityops_schedule_fires_total{instance=~\"$instance\"}", "legendFormat": "{{outcome}}" } ]
+    },
+    {
+      "type": "timeseries", "title": "Tick / dispatch duration p95",
+      "datasource": "${datasource}",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 18 },
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum(rate(qualityops_scheduling_tick_duration_seconds_bucket{instance=~\"$instance\"}[5m])) by (le))", "legendFormat": "tick p95" },
+        { "expr": "histogram_quantile(0.95, sum(rate(qualityops_queue_dispatch_duration_seconds_bucket{instance=~\"$instance\"}[5m])) by (le))", "legendFormat": "dispatch p95" }
+      ]
+    },
+    {
+      "type": "state-timeline", "title": "Scheduling leader by job",
+      "datasource": "${datasource}",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 18 },
+      "targets": [ { "expr": "qualityops_scheduling_leader{instance=~\"$instance\"}", "legendFormat": "{{job}}" } ]
+    },
+
+    {
+      "type": "row", "title": "2D — Reaper & retry", "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 }
+    },
+    {
+      "type": "timeseries", "title": "Reaped by kind",
+      "datasource": "${datasource}",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 27 },
+      "targets": [ { "expr": "qualityops_queue_reaped_total{instance=~\"$instance\"}", "legendFormat": "{{kind}}" } ]
+    },
+    {
+      "type": "stat", "title": "Reaper duration p95",
+      "datasource": "${datasource}",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 27 },
+      "targets": [ { "expr": "histogram_quantile(0.95, sum(rate(qualityops_scheduling_reaper_duration_seconds_bucket{instance=~\"$instance\"}[5m])) by (le))" } ]
+    },
+    {
+      "type": "timeseries", "title": "Retries by outcome",
+      "datasource": "${datasource}",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 27 },
+      "targets": [ { "expr": "qualityops_queue_retries_total{instance=~\"$instance\"}", "legendFormat": "{{outcome}}" } ]
+    },
+
+    {
+      "type": "row", "title": "2D — Webhooks", "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 35 }
+    },
+    {
+      "type": "timeseries", "title": "Webhook delivery by outcome",
+      "datasource": "${datasource}",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 36 },
+      "targets": [ { "expr": "qualityops_webhook_delivery_total{instance=~\"$instance\"}", "legendFormat": "{{outcome}}" } ]
+    },
+    {
+      "type": "stat", "title": "Webhook delivery duration p95",
+      "datasource": "${datasource}",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 36 },
+      "targets": [ { "expr": "histogram_quantile(0.95, sum(rate(qualityops_webhook_delivery_duration_seconds_bucket{instance=~\"$instance\"}[5m])) by (le))" } ]
+    },
+
+    {
+      "type": "row", "title": "Cancellations", "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 44 }
+    },
+    {
+      "type": "timeseries", "title": "Cancellations by phase",
+      "datasource": "${datasource}",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 45 },
+      "targets": [ { "expr": "qualityops_queue_cancellations_total{instance=~\"$instance\"}", "legendFormat": "{{phase}}" } ]
+    }
+  ]
+}

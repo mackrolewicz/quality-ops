@@ -1,4 +1,4 @@
-# Dev overlay — builds and adds the API and Gateway services from source.
+# Dev overlay — builds and adds the API, Worker, and Gateway services from source.
 #
 # Run from the REPOSITORY ROOT (not infra/compose):
 #   docker compose -f infra/compose/docker-compose.yml \
@@ -23,6 +23,21 @@ services:
       JWT_SECRET: ${JWT_SECRET:-ZGV2LXNlY3JldC1jaGFuZ2UtaW4tcHJvZHVjdGlvbi1tdXN0LWJlLWF0LWxlYXN0LTI1Ni1iaXRz}
       SERVER_PORT: "8080"
       SPRING_PROFILES_ACTIVE: local
+      # Read-only artifact object-store access (separate credential from the worker).
+      QUALITYOPS_ARTIFACTS_ENDPOINT: http://minio:9000
+      QUALITYOPS_ARTIFACTS_BUCKET: ${QUALITYOPS_ARTIFACTS_BUCKET:-qualityops-artifacts}
+      QUALITYOPS_ARTIFACTS_ACCESS_KEY: ${MINIO_RO_USER:-qualityops-artifacts-ro}
+      QUALITYOPS_ARTIFACTS_SECRET_KEY: ${MINIO_RO_PASSWORD:-qualityops-artifacts-ro-secret}
+      QUALITYOPS_ARTIFACTS_PRESIGN_TTL: 300s
+      # ADR-009 §4/§8/§12 — repository-run preflight (ref→SHA resolution, the
+      # runner-image allowlist, the "test connection" probe). The API only ever
+      # resolves QUALITYOPS_SCM_CREDENTIAL_* for outbound SCM REST calls; the
+      # plaintext never reaches config_snapshot / an event / a log.
+      QUALITYOPS_REPO_EXEC_ENABLED: ${QUALITYOPS_REPO_EXEC_ENABLED:-true}
+      QUALITYOPS_SCM_CREDENTIAL_DEMO: ${QUALITYOPS_SCM_CREDENTIAL_DEMO:-}
+    networks:
+      - qualityops-internal
+      - default
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
       interval: 30s
@@ -36,6 +51,148 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-bootstrap:
+        condition: service_completed_successfully
+
+  # Second API replica — SAME image/env as `api`, on a different host port, and
+  # deliberately NOT on the gateway route. Its only job is to run a second
+  # ShedLock-coordinated scheduler + dispatcher so the ADR-006 §D leader smoke
+  # has two racers (a schedule fires at most once per occurrence; two dispatchers
+  # never double-dispatch).
+  api-2:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.api
+    ports:
+      - "8082:8080"
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-qualityops}
+      DB_USER: ${POSTGRES_USER:-qualityops}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-qualityops}
+      REDIS_HOST: redis
+      KAFKA_SERVERS: kafka:9092
+      JWT_SECRET: ${JWT_SECRET:-ZGV2LXNlY3JldC1jaGFuZ2UtaW4tcHJvZHVjdGlvbi1tdXN0LWJlLWF0LWxlYXN0LTI1Ni1iaXRz}
+      SERVER_PORT: "8080"
+      SPRING_PROFILES_ACTIVE: local
+      QUALITYOPS_ARTIFACTS_ENDPOINT: http://minio:9000
+      QUALITYOPS_ARTIFACTS_BUCKET: ${QUALITYOPS_ARTIFACTS_BUCKET:-qualityops-artifacts}
+      QUALITYOPS_ARTIFACTS_ACCESS_KEY: ${MINIO_RO_USER:-qualityops-artifacts-ro}
+      QUALITYOPS_ARTIFACTS_SECRET_KEY: ${MINIO_RO_PASSWORD:-qualityops-artifacts-ro-secret}
+      QUALITYOPS_ARTIFACTS_PRESIGN_TTL: 300s
+      QUALITYOPS_REPO_EXEC_ENABLED: ${QUALITYOPS_REPO_EXEC_ENABLED:-true}
+      QUALITYOPS_SCM_CREDENTIAL_DEMO: ${QUALITYOPS_SCM_CREDENTIAL_DEMO:-}
+    networks:
+      - qualityops-internal
+      - default
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-bootstrap:
+        condition: service_completed_successfully
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.worker
+    ports:
+      - "8081:8081"
+    environment:
+      KAFKA_SERVERS: kafka:9092
+      SERVER_PORT: "8081"
+      # Worker's own datasource — a dedicated "worker" schema only (ADR-003 §3).
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-qualityops}
+      DB_USER: ${POSTGRES_USER:-qualityops}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-qualityops}
+      WORKER_EXECUTION_MODE: auto
+      # Local only: allow the in-network echo-target (API smoke) and browser-target
+      # (Playwright browser smoke) for real execution without leaving the network.
+      WORKER_SSRF_ALLOW_PRIVATE: "true"
+      WORKER_SSRF_ALLOWED_HOSTS: echo-target,host.docker.internal,localhost,browser-target
+      # Write-only artifact object-store access — a dedicated least-privilege key
+      # (s3:PutObject + s3:GetObject only), NOT the root pair. The bucket + lifecycle
+      # rule are provisioned by the minio-bootstrap service, so the Worker's own
+      # BucketBootstrap runner is disabled here.
+      QUALITYOPS_ARTIFACTS_ENDPOINT: http://minio:9000
+      QUALITYOPS_ARTIFACTS_BUCKET: ${QUALITYOPS_ARTIFACTS_BUCKET:-qualityops-artifacts}
+      QUALITYOPS_ARTIFACTS_ACCESS_KEY: ${MINIO_RW_USER:-qualityops-artifacts-rw}
+      QUALITYOPS_ARTIFACTS_SECRET_KEY: ${MINIO_RW_PASSWORD:-qualityops-artifacts-rw-secret}
+      QUALITYOPS_ARTIFACTS_SSE: S3
+      WORKER_ARTIFACTS_BOOTSTRAP_ENABLED: "false"
+      WORKER_RETRY_MAX_ATTEMPTS: "2"
+      # A secretRef demo case resolves from this at execution time.
+      QUALITYOPS_SECRET_DEMO_PASSWORD: ${QUALITYOPS_SECRET_DEMO_PASSWORD:-hunter2}
+      # ADR-009 §6/§12 — repository-owned framework execution. The Worker never
+      # talks to the raw host Docker socket in compose: it goes through the
+      # verb-allowlisted docker-proxy (no /exec, /commit, /build, /volumes).
+      # require-proxy=true fails Worker startup if DOCKER_HOST resolves to a raw
+      # unix socket instead — a raw socket is accepted only for local
+      # `mvn spring-boot:run` (loud WARN), never here.
+      QUALITYOPS_REPO_EXEC_ENABLED: ${QUALITYOPS_REPO_EXEC_ENABLED:-true}
+      DOCKER_HOST: tcp://docker-proxy:2375
+      REPO_EXEC_REQUIRE_PROXY: "true"
+      # A repository-run secretRef/credentialRef fixture — the Worker resolves
+      # the SAME QUALITYOPS_SCM_CREDENTIAL_DEMO key as the API (ADR-009 §8),
+      # separately, at framework/checkout-container execution time.
+      QUALITYOPS_SCM_CREDENTIAL_DEMO: ${QUALITYOPS_SCM_CREDENTIAL_DEMO:-}
+    networks:
+      - qualityops-internal
+      - default
+      # Compose only actually creates a top-level network if some service is
+      # attached to it — the Worker joining here is what makes
+      # "qualityops-runner-egress" exist for docker-java to attach an
+      # EGRESS-policy repo-run sibling container to by name at container-create
+      # time (§6). The worker's own control-plane traffic never uses this leg;
+      # it is never given a route to qualityops-internal FROM this network.
+      - qualityops-runner-egress
+    healthcheck:
+      # liveness only — readiness also checks the DB, which is fine to be briefly down
+      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health/liveness"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-bootstrap:
+        condition: service_completed_successfully
+      docker-proxy:
+        condition: service_healthy
+
+  # Local-only in-network HTTP echo, so a triggered run can exercise the real
+  # API runner without leaving the compose network.
+  echo-target:
+    image: mendhak/http-https-echo:31
+    environment:
+      HTTP_PORT: "8080"
+    expose:
+      - "8080"
+
+  # Local-only static site so a browser run can be smoke-tested in-network.
+  browser-target:
+    image: nginx:1.27-alpine
+    volumes:
+      - ../compose/browser-fixture:/usr/share/nginx/html:ro
+    expose:
+      - "80"
 
   gateway:
     build:
@@ -49,6 +206,9 @@ services:
       REDIS_HOST: redis
       SERVER_PORT: "8090"
       SPRING_PROFILES_ACTIVE: local
+    networks:
+      - qualityops-internal
+      - default
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8090/actuator/health"]
       interval: 30s
@@ -59,4 +219,22 @@ services:
       api:
         condition: service_healthy
       redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ../../apps/web
+      dockerfile: ../../infra/docker/Dockerfile.web
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8090}
+    ports:
+      - "5173:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    depends_on:
+      gateway:
         condition: service_healthy

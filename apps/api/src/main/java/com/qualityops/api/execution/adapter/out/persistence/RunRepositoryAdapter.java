@@ -4,14 +4,17 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.qualityops.api.common.PageResult;
 import com.qualityops.api.execution.application.port.out.RunRepository;
+import com.qualityops.api.execution.domain.QueueState;
 import com.qualityops.api.execution.domain.RunConfigSnapshot;
 import com.qualityops.api.execution.domain.RunStats;
 import com.qualityops.api.execution.domain.RunStatus;
 import com.qualityops.api.execution.domain.TestRun;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -34,6 +37,7 @@ class RunRepositoryAdapter implements RunRepository {
             run.projectId(),
             run.suiteId(),
             run.environmentId(),
+            run.executionId(),
             run.status(),
             run.triggeredBy(),
             writeSnapshot(run.configSnapshot()),
@@ -51,11 +55,12 @@ class RunRepositoryAdapter implements RunRepository {
 
     @Override
     public PageResult<TestRun> findAllByOrgId(UUID orgId, UUID projectIdFilter, UUID suiteIdFilter,
-                                               RunStatus statusFilter, int page, int size) {
+                                               RunStatus statusFilter, QueueState queueStateFilter,
+                                               int page, int size) {
         int safePage = page < 1 ? 1 : page;
         int safeSize = Math.min(Math.max(size < 1 ? 20 : size, 1), 100);
         var result = jpa.findAllByOrgId(orgId, projectIdFilter, suiteIdFilter, statusFilter,
-            PageRequest.of(safePage - 1, safeSize));
+            queueStateFilter, PageRequest.of(safePage - 1, safeSize));
         return new PageResult<>(
             result.getContent().stream().map(this::toDomain).toList(),
             safePage,
@@ -65,11 +70,63 @@ class RunRepositoryAdapter implements RunRepository {
     }
 
     @Override
-    public boolean transitionStatus(UUID runId, RunStatus fromStatus, RunStatus toStatus, Instant timestamp) {
+    @Transactional
+    public void transitionToCancelled(UUID runId, UUID orgId) {
+        jpa.markPendingTerminal(runId, orgId, RunStatus.PENDING, RunStatus.CANCELLED, Instant.now());
+    }
+
+    @Override
+    @Transactional
+    public void transitionToFailed(UUID runId, UUID orgId) {
+        jpa.markPendingTerminal(runId, orgId, RunStatus.PENDING, RunStatus.FAILED, Instant.now());
+    }
+
+    @Override
+    public boolean transitionStatus(UUID runId, UUID orgId, UUID executionId,
+                                    RunStatus fromStatus, RunStatus toStatus, Instant timestamp) {
         int updated = toStatus == RunStatus.RUNNING
-            ? jpa.markRunning(runId, fromStatus, toStatus, timestamp)
-            : jpa.markResolved(runId, fromStatus, toStatus, timestamp);
+            ? jpa.markRunning(runId, orgId, executionId, fromStatus, toStatus, timestamp)
+            : jpa.markResolved(runId, orgId, executionId, fromStatus, toStatus, timestamp);
         return updated > 0;
+    }
+
+    @Override
+    public boolean transitionToTerminal(UUID runId, UUID orgId, UUID executionId,
+                                        RunStatus terminalStatus, Instant timestamp) {
+        return jpa.markTerminal(runId, orgId, executionId, terminalStatus, timestamp,
+            List.of(RunStatus.PENDING, RunStatus.RUNNING)) > 0;
+    }
+
+    @Override
+    @Transactional
+    public int reapToFailed(UUID runId, UUID orgId, Instant ts) {
+        return jpa.markReapedFailed(runId, orgId, RunStatus.FAILED, ts,
+            List.of(RunStatus.PENDING, RunStatus.RUNNING));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<String> findConfigSnapshotJson(UUID runId, UUID orgId) {
+        return jpa.findConfigSnapshotJson(runId, orgId);
+    }
+
+    @Override
+    public TestRun saveRetryRun(RetryRunRow row) {
+        var entity = RunEntity.create(
+            row.id(),
+            row.orgId(),
+            row.projectId(),
+            row.suiteId(),
+            row.environmentId(),
+            row.executionId(),
+            RunStatus.PENDING,
+            row.triggeredBy(),
+            row.configSnapshotJson(), // raw verbatim — domain rule #2, no re-freeze
+            null,
+            null,
+            row.createdAt()
+        );
+        return toDomain(jpa.save(entity));
     }
 
     @Override
@@ -88,6 +145,7 @@ class RunRepositoryAdapter implements RunRepository {
             entity.getProjectId(),
             entity.getSuiteId(),
             entity.getEnvironmentId(),
+            entity.getExecutionId(),
             entity.getStatus(),
             entity.getTriggeredBy(),
             readSnapshot(entity.getConfigSnapshotJson()),

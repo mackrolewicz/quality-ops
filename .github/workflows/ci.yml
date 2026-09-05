@@ -1,5 +1,4 @@
 # CI Pipeline — runs on every PR and push to main
-# Placeholder: will be fully configured when apps are scaffolded
 
 name: CI
 
@@ -10,8 +9,207 @@ on:
     branches: [main]
 
 jobs:
-  placeholder:
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+      # ADR-008 §9 — fail on a high/critical advisory in the production tree.
+      # Dev-only advisories are tracked, non-blocking (--omit=dev).
+      - run: npm audit --audit-level=high --omit=dev
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test -- --run
+      - run: npm run build
+
+  backend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: echo "CI pipeline placeholder — configure when apps are scaffolded"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+      # No browser download here: unit build only. The @Tag("browser") ITs and the
+      # Chromium provisioning run in backend-it.
+      - run: mvn -B -ntp -DskipITs -Dplaywright.install.skip=true verify
+
+  backend-it:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-1.55.0
+      - name: Install Playwright system deps
+        run: sudo npx --yes playwright@1.55.0 install-deps chromium
+      - run: mvn -B -ntp verify
+
+  # ADR-009 §9/§13 — the worker's repository-run @Tag("docker") batch, in its
+  # own job so it actually executes for real here (Linux runner, real unix
+  # socket — no Windows Docker Desktop bind-mount stall; see
+  # AbstractDockerRunnerIT's class Javadoc) rather than riding along inside
+  # backend-it's plain `mvn verify` (which also runs it, but mixed in with
+  # everything else and without the runner images pre-pulled).
+  backend-it-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+      # bootOnce() deliberately never pulls itself (a PullImageResultCallback
+      # can wedge Docker Desktop locally, ADR-009 §9) — CI pulls up front
+      # instead, from the same source of truth as the app config defaults.
+      - name: Pre-pull digest-pinned repository-run runner images
+        run: |
+          set -a
+          . infra/compose/runner-images.env
+          set +a
+          docker pull "$QUALITYOPS_REPO_IMAGE_CHECKOUT"
+          docker pull "$QUALITYOPS_REPO_IMAGE_PYTEST"
+          docker pull "$QUALITYOPS_REPO_IMAGE_JUNIT"
+          docker pull "$QUALITYOPS_REPO_IMAGE_PLAYWRIGHT"
+          docker pull "$QUALITYOPS_REPO_IMAGE_CYPRESS"
+          docker pull "$QUALITYOPS_REPO_IMAGE_K6"
+      - name: Run the worker's @Tag("docker") repository-run batch
+        run: mvn -B -ntp -pl apps/worker -am -Dgroups=docker -Dsurefire.failIfNoSpecifiedTests=false verify
+
+  # ADR-008 §9 — dependency & container-image vulnerability scanning.
+  # Parallel with backend / backend-it; the security-scan Maven profile is
+  # opt-in so plain `mvn verify` stays fast.
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+      - name: Cache NVD database
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/owasp/dependency-check-data
+          key: dependency-check-data-${{ runner.os }}
+      - name: OWASP Dependency-Check (fail on CVSS >= 7)
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: mvn -B -ntp -DskipTests -Psecurity-scan verify
+      - name: Collect Dependency-Check SARIF
+        if: always()
+        run: |
+          mkdir -p sarif-results
+          find . -path '*/target/dependency-check-report.sarif' -print0 \
+            | while IFS= read -r -d '' f; do cp "$f" "sarif-results/depcheck-$(echo "$f" | md5sum | cut -c1-8).sarif"; done
+      - name: Build images for scanning
+        run: |
+          docker build -f infra/docker/Dockerfile.api     -t qualityops/api:scan     .
+          docker build -f infra/docker/Dockerfile.worker  -t qualityops/worker:scan  .
+          docker build -f infra/docker/Dockerfile.gateway -t qualityops/gateway:scan .
+      - name: Trivy image scan — api (fail on HIGH/CRITICAL)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: qualityops/api:scan
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          ignore-unfixed: true
+          trivyignores: .trivyignore
+          format: sarif
+          output: sarif-results/trivy-api.sarif
+          limit-severities-for-sarif: true
+      - name: Trivy image scan — worker
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: qualityops/worker:scan
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          ignore-unfixed: true
+          trivyignores: .trivyignore
+          format: sarif
+          output: sarif-results/trivy-worker.sarif
+          limit-severities-for-sarif: true
+      - name: Trivy image scan — gateway
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: qualityops/gateway:scan
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          ignore-unfixed: true
+          trivyignores: .trivyignore
+          format: sarif
+          output: sarif-results/trivy-gateway.sarif
+          limit-severities-for-sarif: true
+      - name: Upload SARIF to code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: sarif-results
+
+  # ADR-009 §5/§12 — the digest-pinned repository-run runner-image allowlist is
+  # itself part of the supply chain (frameworks + checkout for untrusted repo
+  # code); a poisoned/vulnerable upstream tag must fail CI the same way a
+  # vulnerable dependency does. Matrix over the six refs in
+  # infra/compose/runner-images.env (single source of truth, also feeds the
+  # apps/api and apps/worker application.yml defaults).
+  runner-image-scan:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image_var:
+          - QUALITYOPS_REPO_IMAGE_PLAYWRIGHT
+          - QUALITYOPS_REPO_IMAGE_JUNIT
+          - QUALITYOPS_REPO_IMAGE_PYTEST
+          - QUALITYOPS_REPO_IMAGE_CYPRESS
+          - QUALITYOPS_REPO_IMAGE_K6
+          - QUALITYOPS_REPO_IMAGE_CHECKOUT
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve image ref
+        id: image
+        env:
+          IMAGE_VAR: ${{ matrix.image_var }}
+        run: |
+          . infra/compose/runner-images.env
+          echo "ref=${!IMAGE_VAR}" >> "$GITHUB_OUTPUT"
+      - run: mkdir -p sarif-results
+      - name: Trivy image scan (fail on HIGH/CRITICAL)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: ${{ steps.image.outputs.ref }}
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          ignore-unfixed: true
+          trivyignores: .trivyignore
+          format: sarif
+          output: sarif-results/trivy-${{ matrix.image_var }}.sarif
+          limit-severities-for-sarif: true
+      - name: Upload SARIF to code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: sarif-results
+          category: runner-image-${{ matrix.image_var }}

@@ -1,6 +1,6 @@
 package com.qualityops.api.result.application.port.in;
 
-import com.qualityops.api.execution.event.RunCompletedEvent;
+import com.qualityops.events.RunCompletedEvent;
 
 public interface GenerateResultsUseCase {
 

@@ -16,3 +16,11 @@ infra/ @your-github-username
 # Architecture docs — require review for changes
 ARCHITECTURE.md @your-github-username
 docs/architecture/ @your-github-username
+
+# Security-scan suppressions — every change needs review (ADR-008 §9)
+/.github/dependency-check-suppressions.xml @your-github-username
+/.trivyignore @your-github-username
+
+# Digest-pinned repository-run runner-image allowlist — every change needs
+# review (ADR-009 §5)
+/infra/compose/runner-images.env @your-github-username

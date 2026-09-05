@@ -1,3 +1,23 @@
+# ADR-009 §6/§12 — network split so a repository run's sibling containers can
+# NEVER reach Postgres/Redis/Kafka/MinIO control credentials or the Docker
+# control API, regardless of what the repo's own code tries to do:
+#   - qualityops-internal (internal: true, no route to the outside world or the
+#     default bridge/ingress net) carries postgres/redis/kafka/minio, plus
+#     api/worker/gateway (dev overlay) and docker-proxy.
+#   - qualityops-runner-egress is a plain bridge network with NO membership from
+#     postgres/redis/kafka/minio/docker-proxy — only the Worker's ephemeral
+#     checkout container (always) and an EGRESS-policy framework container ever
+#     join it, and only at container-create time (NetworkMode.EGRESS), never via
+#     this compose file.
+# An ISOLATED-policy framework container joins neither network
+# (NetworkMode.NONE) and is therefore unreachable and can reach nothing.
+networks:
+  qualityops-internal:
+    name: qualityops-internal
+    internal: true
+  qualityops-runner-egress:
+    name: qualityops-runner-egress
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -9,6 +29,8 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - qualityops-internal
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-qualityops}"]
       interval: 5s
@@ -22,6 +44,8 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    networks:
+      - qualityops-internal
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -31,6 +55,8 @@ services:
 
   kafka:
     image: confluentinc/cp-kafka:7.6.1
+    networks:
+      - qualityops-internal
     ports:
       - "29092:29092"
     environment:
@@ -56,6 +82,112 @@ services:
       retries: 10
       start_period: 30s
 
+  # Durable test-artifact object store (ADR-005). Infra, like postgres/redis/kafka.
+  minio:
+    image: minio/minio:RELEASE.2024-01-16T16-07-38Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      # Built-in KMS so SSE-S3 (AES256) PUTs succeed without a separate KES (dev only).
+      MINIO_KMS_SECRET_KEY: ${MINIO_KMS_SECRET_KEY:-qualityops-key:SRQ1GITaFoeyk14g0b5x+if/Fph5CjoSRfT1Bs7ipx0=}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - qualityops-internal
+    healthcheck:
+      # The minio image ships `mc` but not curl/wget; alias + `mc ready` is the check.
+      test: ["CMD-SHELL", "mc alias set hc http://localhost:9000 \"$$MINIO_ROOT_USER\" \"$$MINIO_ROOT_PASSWORD\" >/dev/null 2>&1 && mc ready hc"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+      start_period: 15s
+
+  # One-shot: create the bucket, block public access, apply a retention rule,
+  # and provision two least-privilege credentials — write-only for the Worker,
+  # read-only for the API (ADR-005 §1.5). The root pair is never handed to an app.
+  minio-bootstrap:
+    image: minio/mc:RELEASE.2024-01-16T16-06-34Z
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - qualityops-internal
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      ARTIFACTS_BUCKET: ${QUALITYOPS_ARTIFACTS_BUCKET:-qualityops-artifacts}
+      ARTIFACTS_RW_USER: ${MINIO_RW_USER:-qualityops-artifacts-rw}
+      ARTIFACTS_RW_PASSWORD: ${MINIO_RW_PASSWORD:-qualityops-artifacts-rw-secret}
+      ARTIFACTS_RO_USER: ${MINIO_RO_USER:-qualityops-artifacts-ro}
+      ARTIFACTS_RO_PASSWORD: ${MINIO_RO_PASSWORD:-qualityops-artifacts-ro-secret}
+      ARTIFACTS_RETENTION_DAYS: ${QUALITYOPS_ARTIFACTS_RETENTION_DAYS:-30}
+    # Policy JSON is written inline (no bind mount) so this is fully self-contained
+    # on hosts where bind mounts of the project path misbehave. The canonical
+    # policy documents also live under infra/compose/minio-policies/ for the K8s path.
+    # Only genuinely-idempotent commands (user already exists, policy already
+    # attached) are guarded with `|| true`; bucket creation, public-access denial
+    # and policy creation are fail-fast so a partial bootstrap cannot pass as healthy.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
+        mc mb --ignore-existing "local/$$ARTIFACTS_BUCKET"
+        mc anonymous set none "local/$$ARTIFACTS_BUCKET"
+        mc ilm rule add --expire-days "$$ARTIFACTS_RETENTION_DAYS" "local/$$ARTIFACTS_BUCKET" \
+          || echo "WARN: retention rule not applied (mc ilm flag mismatch); object-store policy must own retention"
+        printf '%s' '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:PutObject","s3:GetObject"],"Resource":["arn:aws:s3:::'"$$ARTIFACTS_BUCKET"'/*"]}]}' > /tmp/artifacts-rw.json
+        printf '%s' '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:GetObject"],"Resource":["arn:aws:s3:::'"$$ARTIFACTS_BUCKET"'/*"]}]}' > /tmp/artifacts-ro.json
+        mc admin policy create local artifacts-rw /tmp/artifacts-rw.json
+        mc admin policy create local artifacts-ro /tmp/artifacts-ro.json
+        mc admin user add local "$$ARTIFACTS_RW_USER" "$$ARTIFACTS_RW_PASSWORD" || true
+        mc admin user add local "$$ARTIFACTS_RO_USER" "$$ARTIFACTS_RO_PASSWORD" || true
+        mc admin policy attach local artifacts-rw --user "$$ARTIFACTS_RW_USER" || true
+        mc admin policy attach local artifacts-ro --user "$$ARTIFACTS_RO_USER" || true
+        echo "minio-bootstrap complete"
+
+  # ADR-009 §6 — verb-allowlisted broker in front of the host Docker socket so
+  # the Worker (`DOCKER_HOST=tcp://docker-proxy:2375`, dev overlay) can create /
+  # start / wait / log / kill / remove ITS OWN repo-run sibling containers but
+  # can never `exec` into a container, `commit`/`build` an image, touch
+  # `volumes`, or reach Swarm — a poisoned/compromised repo-run command cannot
+  # escalate through the Worker into full Docker (== host root) access. Pinned
+  # image, read-only socket bind. Never gets the runner-egress network — it only
+  # needs to be reachable from the Worker over `qualityops-internal`.
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy:0.3.0
+    environment:
+      CONTAINERS: "1"
+      IMAGES: "1"
+      NETWORKS: "1"
+      POST: "1"
+      EXEC: "0"
+      VOLUMES: "0"
+      BUILD: "0"
+      COMMIT: "0"
+      SWARM: "0"
+      SYSTEM: "0"
+      INFO: "1"
+      PING: "1"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - qualityops-internal
+    healthcheck:
+      # The image is Alpine/haproxy-based (no curl); busybox wget is present.
+      test: ["CMD", "wget", "-qO-", "http://localhost:2375/_ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
 volumes:
   postgres_data:
   redis_data:
+  minio_data:

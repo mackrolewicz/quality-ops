@@ -9,6 +9,7 @@ public record TestRun(
     UUID projectId,
     UUID suiteId,
     UUID environmentId,
+    UUID executionId,
     RunStatus status,
     UUID triggeredBy,
     RunConfigSnapshot configSnapshot,

@@ -1,0 +1,10 @@
+# Trivy container-image scan ignore file (ADR-008 §9).
+#
+# RULES (enforced by review; this file is CODEOWNERS-guarded):
+#   * Time-boxed entries ONLY. Every line MUST end with `# review-by:YYYY-MM-DD`.
+#   * Every entry MUST state why the CVE does not apply / a linked issue.
+#   * No permanent entries. A real HIGH/CRITICAL is fixed or explicitly,
+#     reviewably suppressed here.
+#
+# Format:
+#   CVE-XXXX-XXXXX # base-image only, not reachable from our code, #123 # review-by:2026-12-31

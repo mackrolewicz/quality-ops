@@ -1,5 +1,7 @@
 package com.qualityops.api.environment.application.service;
 
+import com.qualityops.api.audit.annotation.Audited;
+import com.qualityops.api.audit.domain.AuditAction;
 import com.qualityops.api.common.PageResult;
 import com.qualityops.api.environment.application.port.in.CreateEnvironmentUseCase;
 import com.qualityops.api.environment.application.port.in.DeleteEnvironmentUseCase;
@@ -38,6 +40,7 @@ public class EnvironmentService implements CreateEnvironmentUseCase, ListEnviron
     }
 
     @Override
+    @Audited(action = AuditAction.ENVIRONMENT_CREATE, targetType = "environment")
     public EnvironmentResponse create(UUID projectId, CreateEnvironmentRequest request, UUID orgId) {
         getProjectUseCase.getDomain(projectId, orgId);
         var now = Instant.now();
@@ -82,6 +85,7 @@ public class EnvironmentService implements CreateEnvironmentUseCase, ListEnviron
     }
 
     @Override
+    @Audited(action = AuditAction.ENVIRONMENT_UPDATE, targetType = "environment")
     public EnvironmentResponse update(UUID id, UpdateEnvironmentRequest request, UUID orgId) {
         var existing = getDomain(id, orgId);
         var updated = new Environment(
@@ -101,6 +105,7 @@ public class EnvironmentService implements CreateEnvironmentUseCase, ListEnviron
     }
 
     @Override
+    @Audited(action = AuditAction.ENVIRONMENT_DELETE, targetType = "environment")
     public void delete(UUID id, UUID orgId) {
         getDomain(id, orgId);
         environmentRepository.softDelete(id, orgId, Instant.now());

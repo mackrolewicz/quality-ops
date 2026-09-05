@@ -17,3 +17,8 @@ paths:
   Dependency direction: adapters → application (ports) → domain.
 - Simple CRUD modules can use flat structure (controller → service → repo).
 - Flyway migrations are append-only. Never edit an applied migration.
+- AOP self-invocation: annotate `@Audited`/`@Timed` ONLY on the outermost service
+  entry point a controller (or another bean) calls. Never on a `private` method or
+  a method only called via `this.other()` inside the same bean — the proxy is
+  bypassed and the aspect is silently skipped. If an inner step must be audited,
+  extract it into its own bean. Do NOT use `AopContext.currentProxy()`.

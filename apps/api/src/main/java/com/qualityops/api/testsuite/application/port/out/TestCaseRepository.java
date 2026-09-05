@@ -19,5 +19,9 @@ public interface TestCaseRepository {
 
     Optional<Integer> findMaxOrderIndexBySuiteId(UUID suiteId, UUID orgId);
 
+    /** ADR-009 §11 — count of non-deleted cases in the org whose {@code repo_test}
+     *  spec references the given repository connection. */
+    long countReferencingConnection(UUID orgId, UUID connectionId);
+
     void softDelete(UUID id, UUID orgId, Instant deletedAt);
 }

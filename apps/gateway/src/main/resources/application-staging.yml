@@ -1,0 +1,21 @@
+# ADR-008 §8 — opt-in gateway TLS for LB-less staging / local-staging parity.
+#
+# The RECOMMENDED path terminates TLS at the load balancer / ingress (Azure
+# Application Gateway, nginx-ingress) and leaves the gateway on plain HTTP on the
+# pod network — in that case set GATEWAY_TLS_ENABLED=false and keep port 8090.
+#
+# This profile is inert unless SPRING_PROFILES_ACTIVE=staging. No keystore is
+# committed (that would be secret material); it is referenced by env var only.
+# See docs/runbooks/https-staging.md.
+server:
+  port: ${SERVER_PORT:8443}
+  ssl:
+    enabled: ${GATEWAY_TLS_ENABLED:true}
+    key-store: ${GATEWAY_TLS_KEYSTORE:file:/etc/qualityops/tls/keystore.p12}
+    key-store-type: PKCS12
+    key-store-password: ${GATEWAY_TLS_KEYSTORE_PASSWORD:}
+    key-alias: ${GATEWAY_TLS_KEY_ALIAS:qualityops-gateway}
+
+# HSTS is already emitted for every response by the base profile
+# (spring.cloud.gateway.filter.secure-headers.strict-transport-security) and is
+# unchanged here.

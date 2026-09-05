@@ -12,5 +12,6 @@ public record TestResult(
     int durationMs,
     String errorMessage,
     int retryCount,
+    int attemptEpoch,
     Instant createdAt
 ) {}
