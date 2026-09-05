@@ -112,15 +112,39 @@ class GatewayIT {
     }
 
     @Test
-    void burstAboveCapacity_isRateLimitedWith429() {
-        boolean sawTooManyRequests = false;
-        for (int i = 0; i < 400 && !sawTooManyRequests; i++) {
-            int status = client().get().uri("/api/v1/ping").exchange()
-                .returnResult(Void.class).getStatus().value();
-            sawTooManyRequests = status == 429;
+    void burstAboveCapacity_isRateLimitedWith429() throws InterruptedException {
+        // Fired CONCURRENTLY, not one request at a time: a sequential loop lets
+        // the token bucket refill between requests whenever per-request latency
+        // is high enough (a slower/busier CI runner vs. this dev box), so a
+        // burst that reliably trips the limiter locally can complete its whole
+        // sequential run on CI without a single request landing inside the same
+        // refill window. Firing them at once is what "burst" actually means and
+        // is a strictly stronger assertion of real rate-limit enforcement, not
+        // a weaker one.
+        int requestCount = 400;
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(32);
+        var sawTooManyRequests = new java.util.concurrent.atomic.AtomicBoolean(false);
+        var ready = new java.util.concurrent.CountDownLatch(requestCount);
+        try {
+            for (int i = 0; i < requestCount; i++) {
+                pool.submit(() -> {
+                    try {
+                        int status = client().get().uri("/api/v1/ping").exchange()
+                            .returnResult(Void.class).getStatus().value();
+                        if (status == 429) {
+                            sawTooManyRequests.set(true);
+                        }
+                    } finally {
+                        ready.countDown();
+                    }
+                });
+            }
+            ready.await(30, TimeUnit.SECONDS);
+        } finally {
+            pool.shutdownNow();
         }
-        assertThat(sawTooManyRequests)
-            .as("a sustained burst above burstCapacity should yield at least one 429")
+        assertThat(sawTooManyRequests.get())
+            .as("a concurrent burst above burstCapacity should yield at least one 429")
             .isTrue();
     }
 
