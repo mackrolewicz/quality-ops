@@ -19,6 +19,107 @@
     release now exists, upgrade instead of renewing the suppression.
   -->
 
+  <!--
+    Second pass (2026-09-05, same review-by date): dependency-check's first
+    printed summary did not enumerate every module of an already-suppressed
+    release train. These 4 are siblings of artifacts already suppressed above
+    (same CVE ids, same release, same "no newer version published" rationale)
+    - kotlin-stdlib-jdk7 alongside kotlin-stdlib, netty-transport-native-unix-common
+    alongside netty-transport, spring-boot-starter alongside the other
+    spring-boot-* artifacts, spring-security-config alongside
+    spring-security-core/web.
+  -->
+
+  <!-- kotlin-stdlib-jdk7-1.9.25.jar (sibling of kotlin-stdlib-1.9.25.jar) -->
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      CVE-2026-53914 against kotlin-stdlib-jdk7-1.9.25.jar (same CVE as
+      kotlin-stdlib-1.9.25.jar - see that entry). No newer release exists in
+      the public registry as of 2026-09-05. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.jetbrains.kotlin/kotlin-stdlib-jdk7@1.9.25</packageUrl>
+    <cve>CVE-2026-53914</cve>
+  </suppress>
+
+  <!-- netty-transport-native-unix-common-4.1.122.Final.jar (sibling of netty-transport) -->
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      Same 41 CVEs as netty-transport-4.1.122.Final.jar (this is a sibling
+      module of the same Netty release) - see that entry's notes.
+      review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/io.netty/netty-transport-native-unix-common@4.1.122.Final</packageUrl>
+    <cve>CVE-2026-44893</cve>
+    <cve>CVE-2026-44250</cve>
+    <cve>CVE-2026-48059</cve>
+    <cve>CVE-2026-44890</cve>
+    <cve>CVE-2026-44891</cve>
+    <cve>CVE-2026-50011</cve>
+    <cve>CVE-2026-59901</cve>
+    <cve>CVE-2026-42587</cve>
+    <cve>CVE-2026-42586</cve>
+    <cve>CVE-2026-44248</cve>
+    <cve>CVE-2025-58056</cve>
+    <cve>CVE-2026-44249</cve>
+    <cve>CVE-2025-58057</cve>
+    <cve>CVE-2026-45416</cve>
+    <cve>CVE-2026-45674</cve>
+    <cve>CVE-2026-56745</cve>
+    <cve>CVE-2026-56822</cve>
+    <cve>CVE-2026-56821</cve>
+    <cve>CVE-2026-47691</cve>
+    <cve>CVE-2026-56820</cve>
+    <cve>CVE-2026-50010</cve>
+    <cve>CVE-2026-56819</cve>
+    <cve>CVE-2026-56817</cve>
+    <cve>CVE-2026-62380</cve>
+    <cve>CVE-2026-59898</cve>
+    <cve>CVE-2026-59899</cve>
+    <cve>CVE-2026-55851</cve>
+    <cve>CVE-2025-55163</cve>
+    <cve>CVE-2026-42581</cve>
+    <cve>CVE-2026-48006</cve>
+    <cve>CVE-2026-42585</cve>
+    <cve>CVE-2026-42584</cve>
+    <cve>CVE-2026-46340</cve>
+    <cve>CVE-2026-42583</cve>
+    <cve>CVE-2026-48043</cve>
+    <cve>CVE-2026-55833</cve>
+    <cve>CVE-2026-55831</cve>
+    <cve>CVE-2026-33871</cve>
+    <cve>CVE-2026-33870</cve>
+    <cve>CVE-2026-42578</cve>
+    <cve>CVE-2026-42579</cve>
+  </suppress>
+
+  <!-- spring-boot-starter-3.3.13.jar (sibling of spring-boot / -starter-web / -starter-data-jpa) -->
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      Same 5 CVEs as spring-boot-3.3.13.jar (spring-boot-starter is a sibling
+      artifact of the same release) - see that entry's notes.
+      review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework.boot/spring-boot-starter@3.3.13</packageUrl>
+    <cve>CVE-2026-40972</cve>
+    <cve>CVE-2026-40975</cve>
+    <cve>CVE-2026-22733</cve>
+    <cve>CVE-2026-40973</cve>
+    <cve>CVE-2026-40974</cve>
+  </suppress>
+
+  <!-- spring-security-config-6.3.10.jar (sibling of spring-security-core/web) -->
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      Same 3 CVEs as spring-security-core-6.3.10.jar (spring-security-config is
+      a sibling artifact of the same release) - see that entry's notes.
+      review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework.security/spring-security-config@6.3.10</packageUrl>
+    <cve>CVE-2026-40988</cve>
+    <cve>CVE-2026-47838</cve>
+    <cve>CVE-2026-22732</cve>
+  </suppress>
+
   <!-- angus-activation-2.0.2.jar -->
   <suppress until="2026-12-04Z">
     <notes><![CDATA[
