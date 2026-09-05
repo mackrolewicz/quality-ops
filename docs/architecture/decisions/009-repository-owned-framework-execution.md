@@ -252,11 +252,11 @@ Cross-module dependency: `execution` (`RunEnqueueService`) → `scm` (`ResolveRe
 **Decision: a config map `qualityops.repo-exec.images.<preset>` of digest-pinned refs, one per `FrameworkPreset`, plus `images.checkout`. There is NO image field on `RepoTestSnapshot` or the authoring DTO in 2F. The API freezes the ref into `repository_run.runner_image_ref` at enqueue; the Worker enforces the same map at container-create time and records the digest actually pulled.**
 
 ```
-qualityops.repo-exec.images.playwright = mcr.microsoft.com/playwright:v1.55.0-jammy@sha256:<pin>
+qualityops.repo-exec.images.playwright = mcr.microsoft.com/playwright:v1.59.1-jammy@sha256:<pin>
 qualityops.repo-exec.images.junit      = maven:3.9-eclipse-temurin-21@sha256:<pin>
 qualityops.repo-exec.images.pytest     = python:3.12-slim@sha256:<pin>
-qualityops.repo-exec.images.cypress    = cypress/included:13.15.0@sha256:<pin>
-qualityops.repo-exec.images.k6         = grafana/k6:0.54.0@sha256:<pin>
+qualityops.repo-exec.images.cypress    = cypress/included:16.0.0@sha256:<pin>
+qualityops.repo-exec.images.k6         = grafana/k6:1.8.1@sha256:<pin>
 qualityops.repo-exec.images.checkout   = alpine/git:2.45@sha256:<pin>
 ```
 
@@ -382,11 +382,11 @@ Two phases so `git` and the checkout token never enter the framework image or to
 ```
 # --- API + Worker ---
 qualityops.repo-exec.enabled                         true
-qualityops.repo-exec.images.playwright               mcr.microsoft.com/playwright:v1.55.0-jammy@sha256:<pin>
+qualityops.repo-exec.images.playwright               mcr.microsoft.com/playwright:v1.59.1-jammy@sha256:<pin>
 qualityops.repo-exec.images.junit                    maven:3.9-eclipse-temurin-21@sha256:<pin>
 qualityops.repo-exec.images.pytest                   python:3.12-slim@sha256:<pin>
-qualityops.repo-exec.images.cypress                  cypress/included:13.15.0@sha256:<pin>
-qualityops.repo-exec.images.k6                       grafana/k6:0.54.0@sha256:<pin>
+qualityops.repo-exec.images.cypress                  cypress/included:16.0.0@sha256:<pin>
+qualityops.repo-exec.images.k6                       grafana/k6:1.8.1@sha256:<pin>
 qualityops.repo-exec.default-run-timeout             PT10M
 qualityops.repo-exec.max-run-timeout                 PT30M
 qualityops.repo-exec.default-resource-profile        SMALL

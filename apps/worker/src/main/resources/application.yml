@@ -137,12 +137,12 @@ qualityops:
     images:
       # Resolved for real — see infra/compose/runner-images.env (single source
       # of truth, also feeds CI's Trivy scan matrix). Never hand-edit a digest.
-      playwright: ${QUALITYOPS_REPO_IMAGE_PLAYWRIGHT:mcr.microsoft.com/playwright:v1.55.0-jammy@sha256:55db7b712a981e9cc1ec757a4511cd01c5ed4e20bd7c84b2dee4e1d320102b9d}
+      playwright: ${QUALITYOPS_REPO_IMAGE_PLAYWRIGHT:mcr.microsoft.com/playwright:v1.59.1-jammy@sha256:8a0360d39d1973be506dd59002904a774f6d697d4946c94063b3fd006461c8ff}
       junit: ${QUALITYOPS_REPO_IMAGE_JUNIT:maven:3.9-eclipse-temurin-21@sha256:8f6ac126f7810bb5549c4cd122d2bf0e9cda5bdeb0838aa928f09e779fd8bef8}
       pytest: ${QUALITYOPS_REPO_IMAGE_PYTEST:python:3.12-slim@sha256:78387bc3881b8273120a12ebe6c1ab22b018ccc2c9adf565ae1ac9b536e184ea}
-      cypress: ${QUALITYOPS_REPO_IMAGE_CYPRESS:cypress/included:13.15.0@sha256:d2123cf33edc48d3e3f30bd24231459ca5291dcf66b91b0b30b50ffe568eb707}
-      k6: ${QUALITYOPS_REPO_IMAGE_K6:grafana/k6:0.54.0@sha256:1f40432b1cbe7234e977f96c362c9bc550a2d2b583d014dd8669fe40d3e9e755}
-      checkout: ${QUALITYOPS_REPO_IMAGE_CHECKOUT:alpine/git:2.45.2@sha256:16ad8e788e1d3b0c30f18da8dde5c0ace3b187445a62d8af893b003ca1e70592}
+      cypress: ${QUALITYOPS_REPO_IMAGE_CYPRESS:cypress/included:16.0.0@sha256:49c58ea4e365f78e46589e066f1d9136d86a41f0e82226f5b6d5e55dafe0c8b2}
+      k6: ${QUALITYOPS_REPO_IMAGE_K6:grafana/k6:1.8.1@sha256:23f2279054c3e01535455c4d92914a625df12aeb631ea0e3ea7a43f96bcbc843}
+      checkout: ${QUALITYOPS_REPO_IMAGE_CHECKOUT:alpine/git:2.54.0@sha256:4f9488b7295baec153a9953479690f835ad4699b1d9f11e3897a4485c224fc3e}
     image-pull-on-startup: ${QUALITYOPS_REPO_IMAGE_PULL_ON_STARTUP:true}
     default-run-timeout: PT10M
     max-run-timeout: PT30M

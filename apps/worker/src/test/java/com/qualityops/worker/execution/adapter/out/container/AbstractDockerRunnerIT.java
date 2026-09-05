@@ -79,7 +79,7 @@ abstract class AbstractDockerRunnerIT {
     private static final Logger log = LoggerFactory.getLogger(AbstractDockerRunnerIT.class);
     private static final Duration BOOT_TIMEOUT = Duration.ofSeconds(45);
 
-    protected static final String CHECKOUT_TAG = "alpine/git:2.45.2";
+    protected static final String CHECKOUT_TAG = "alpine/git:2.54.0";
 
     protected static volatile DockerClient docker;
     protected static volatile String pinnedRef;   // alpine/git@sha256:<real digest>
@@ -108,7 +108,7 @@ abstract class AbstractDockerRunnerIT {
 
         // The runner-image allowlist requires digest-pinned refs. The
         // @Tag("docker") batch expects the tiny alpine/git image to be present
-        // (CI provisions it; locally: `docker pull alpine/git:2.45.2`). No pull
+        // (CI provisions it; locally: `docker pull alpine/git:2.54.0`). No pull
         // here — PullImageResultCallback can wedge on Docker Desktop.
         List<String> repoDigests;
         try {
