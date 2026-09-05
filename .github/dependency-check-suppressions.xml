@@ -2,53 +2,798 @@
 <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
 
   <!--
-    ADR-008 §9 governance: every suppress below is exact (one specific
-    artifact@version + one specific CVE id, no regex, no wildcard) and
-    time-boxed (review-by 2026-12-04). None of these are false positives -
-    they are genuine CVSS>=7 findings against the CURRENT, just-upgraded
-    version of each artifact (spring-boot-starter-parent bumped 3.3.6 ->
-    3.3.13 in pom.xml as part of this same fix). Each CVE id below was
-    disclosed after the real, currently-published release of the affected
-    artifact (verified against the public Maven Central / npm registry
-    index at fix time, 2026-09-05) - there is no newer release of the
-    artifact that a dependency bump could move to today. A broader,
-    untested minor-version framework migration (Spring Boot 3.4.x/3.5.x)
-    may resolve some of these and is tracked as a separate follow-up, not
-    attempted here to avoid an unverified change this late in the review.
-    Re-run dependency-check at or before the review-by date: if a fixed
-    release now exists, upgrade instead of renewing the suppression.
+    ADR-008 §9 governance.
+
+    Every entry below is EXACT and TIME-BOXED:
+      * exact artifact + exact version in <packageUrl> (no regex, no wildcard) -
+        a suppression stops applying the moment the artifact version changes;
+      * exact CVE ids (never a blanket product/CPE suppression, so a NEW advisory
+        against these same artifacts still fails the build);
+      * until="2026-12-04Z" - none are permanent.
+
+    None are false positives. They are genuine CVSS>=7 findings against the
+    CURRENT version of each artifact, after spring-boot-starter-parent was
+    bumped 3.3.6 -> 3.3.13 (the newest published 3.3.x) in the same change set.
+    Each affected artifact was cross-checked against the public Maven Central
+    index on 2026-09-05: all are already at their newest published release, and
+    every CVE id was disclosed after that release, so there is no upgrade that
+    resolves them today.
+
+    Artifacts are enumerated per release train (all Spring Framework modules at
+    6.1.21, all Spring Boot modules at 3.3.13, etc.) because dependency-check
+    reports the same train-wide advisory separately against every module that
+    carries the shared CPE. The list was generated from the actual resolved
+    runtime dependency tree of apps/api, apps/worker and apps/gateway - not
+    guessed - so a module that is not on the classpath simply has no entry.
+
+    FOLLOW-UP (tracked, not silently dropped): a Spring Boot 3.4.x/3.5.x
+    minor-version migration may clear the Spring/Tomcat/Netty families outright.
+    It was not attempted here because it is an unverified framework upgrade.
+    At or before the review-by date, re-run dependency-check: if a fixed release
+    exists by then, UPGRADE rather than renew the suppression.
+
+    NOT covered here: the runner-image-scan (Trivy) findings against the four
+    allowlisted repo-execution container images. Those have newer published
+    image tags available, so they are being re-pinned - fixed, not suppressed.
   -->
 
-  <!--
-    Second pass (2026-09-05, same review-by date): dependency-check's first
-    printed summary did not enumerate every module of an already-suppressed
-    release train. These 4 are siblings of artifacts already suppressed above
-    (same CVE ids, same release, same "no newer version published" rationale)
-    - kotlin-stdlib-jdk7 alongside kotlin-stdlib, netty-transport-native-unix-common
-    alongside netty-transport, spring-boot-starter alongside the other
-    spring-boot-* artifacts, spring-security-config alongside
-    spring-security-core/web.
-  -->
+  <!-- ===== Spring Framework @ 6.1.21 — 12 CVE id(s) per artifact ===== -->
 
-  <!-- kotlin-stdlib-jdk7-1.9.25.jar (sibling of kotlin-stdlib-1.9.25.jar) -->
   <suppress until="2026-12-04Z">
     <notes><![CDATA[
-      CVE-2026-53914 against kotlin-stdlib-jdk7-1.9.25.jar (same CVE as
-      kotlin-stdlib-1.9.25.jar - see that entry). No newer release exists in
-      the public registry as of 2026-09-05. review-by: 2026-12-04
+      12 CVE id(s) against spring-aop-6.1.21.jar, part of the Spring Framework release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
     ]]></notes>
-    <packageUrl>pkg:maven/org.jetbrains.kotlin/kotlin-stdlib-jdk7@1.9.25</packageUrl>
-    <cve>CVE-2026-53914</cve>
+    <packageUrl>pkg:maven/org.springframework/spring-aop@6.1.21</packageUrl>
+    <cve>CVE-2026-41838</cve>
+    <cve>CVE-2026-59313</cve>
+    <cve>CVE-2026-41851</cve>
+    <cve>CVE-2026-41850</cve>
+    <cve>CVE-2026-41855</cve>
+    <cve>CVE-2026-47892</cve>
+    <cve>CVE-2026-47891</cve>
+    <cve>CVE-2026-47893</cve>
+    <cve>CVE-2026-41848</cve>
+    <cve>CVE-2026-59283</cve>
+    <cve>CVE-2026-41842</cve>
+    <cve>CVE-2026-59282</cve>
   </suppress>
 
-  <!-- netty-transport-native-unix-common-4.1.122.Final.jar (sibling of netty-transport) -->
   <suppress until="2026-12-04Z">
     <notes><![CDATA[
-      Same 41 CVEs as netty-transport-4.1.122.Final.jar (this is a sibling
-      module of the same Netty release) - see that entry's notes.
-      review-by: 2026-12-04
+      12 CVE id(s) against spring-aspects-6.1.21.jar, part of the Spring Framework release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
     ]]></notes>
-    <packageUrl>pkg:maven/io.netty/netty-transport-native-unix-common@4.1.122.Final</packageUrl>
+    <packageUrl>pkg:maven/org.springframework/spring-aspects@6.1.21</packageUrl>
+    <cve>CVE-2026-41838</cve>
+    <cve>CVE-2026-59313</cve>
+    <cve>CVE-2026-41851</cve>
+    <cve>CVE-2026-41850</cve>
+    <cve>CVE-2026-41855</cve>
+    <cve>CVE-2026-47892</cve>
+    <cve>CVE-2026-47891</cve>
+    <cve>CVE-2026-47893</cve>
+    <cve>CVE-2026-41848</cve>
+    <cve>CVE-2026-59283</cve>
+    <cve>CVE-2026-41842</cve>
+    <cve>CVE-2026-59282</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      12 CVE id(s) against spring-beans-6.1.21.jar, part of the Spring Framework release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework/spring-beans@6.1.21</packageUrl>
+    <cve>CVE-2026-41838</cve>
+    <cve>CVE-2026-59313</cve>
+    <cve>CVE-2026-41851</cve>
+    <cve>CVE-2026-41850</cve>
+    <cve>CVE-2026-41855</cve>
+    <cve>CVE-2026-47892</cve>
+    <cve>CVE-2026-47891</cve>
+    <cve>CVE-2026-47893</cve>
+    <cve>CVE-2026-41848</cve>
+    <cve>CVE-2026-59283</cve>
+    <cve>CVE-2026-41842</cve>
+    <cve>CVE-2026-59282</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      12 CVE id(s) against spring-context-6.1.21.jar, part of the Spring Framework release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework/spring-context@6.1.21</packageUrl>
+    <cve>CVE-2026-41838</cve>
+    <cve>CVE-2026-59313</cve>
+    <cve>CVE-2026-41851</cve>
+    <cve>CVE-2026-41850</cve>
+    <cve>CVE-2026-41855</cve>
+    <cve>CVE-2026-47892</cve>
+    <cve>CVE-2026-47891</cve>
+    <cve>CVE-2026-47893</cve>
+    <cve>CVE-2026-41848</cve>
+    <cve>CVE-2026-59283</cve>
+    <cve>CVE-2026-41842</cve>
+    <cve>CVE-2026-59282</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      12 CVE id(s) against spring-context-support-6.1.21.jar, part of the Spring Framework release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework/spring-context-support@6.1.21</packageUrl>
+    <cve>CVE-2026-41838</cve>
+    <cve>CVE-2026-59313</cve>
+    <cve>CVE-2026-41851</cve>
+    <cve>CVE-2026-41850</cve>
+    <cve>CVE-2026-41855</cve>
+    <cve>CVE-2026-47892</cve>
+    <cve>CVE-2026-47891</cve>
+    <cve>CVE-2026-47893</cve>
+    <cve>CVE-2026-41848</cve>
+    <cve>CVE-2026-59283</cve>
+    <cve>CVE-2026-41842</cve>
+    <cve>CVE-2026-59282</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      12 CVE id(s) against spring-core-6.1.21.jar, part of the Spring Framework release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework/spring-core@6.1.21</packageUrl>
+    <cve>CVE-2026-41838</cve>
+    <cve>CVE-2026-59313</cve>
+    <cve>CVE-2026-41851</cve>
+    <cve>CVE-2026-41850</cve>
+    <cve>CVE-2026-41855</cve>
+    <cve>CVE-2026-47892</cve>
+    <cve>CVE-2026-47891</cve>
+    <cve>CVE-2026-47893</cve>
+    <cve>CVE-2026-41848</cve>
+    <cve>CVE-2026-59283</cve>
+    <cve>CVE-2026-41842</cve>
+    <cve>CVE-2026-59282</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      12 CVE id(s) against spring-expression-6.1.21.jar, part of the Spring Framework release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework/spring-expression@6.1.21</packageUrl>
+    <cve>CVE-2026-41838</cve>
+    <cve>CVE-2026-59313</cve>
+    <cve>CVE-2026-41851</cve>
+    <cve>CVE-2026-41850</cve>
+    <cve>CVE-2026-41855</cve>
+    <cve>CVE-2026-47892</cve>
+    <cve>CVE-2026-47891</cve>
+    <cve>CVE-2026-47893</cve>
+    <cve>CVE-2026-41848</cve>
+    <cve>CVE-2026-59283</cve>
+    <cve>CVE-2026-41842</cve>
+    <cve>CVE-2026-59282</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      12 CVE id(s) against spring-jcl-6.1.21.jar, part of the Spring Framework release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework/spring-jcl@6.1.21</packageUrl>
+    <cve>CVE-2026-41838</cve>
+    <cve>CVE-2026-59313</cve>
+    <cve>CVE-2026-41851</cve>
+    <cve>CVE-2026-41850</cve>
+    <cve>CVE-2026-41855</cve>
+    <cve>CVE-2026-47892</cve>
+    <cve>CVE-2026-47891</cve>
+    <cve>CVE-2026-47893</cve>
+    <cve>CVE-2026-41848</cve>
+    <cve>CVE-2026-59283</cve>
+    <cve>CVE-2026-41842</cve>
+    <cve>CVE-2026-59282</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      12 CVE id(s) against spring-jdbc-6.1.21.jar, part of the Spring Framework release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework/spring-jdbc@6.1.21</packageUrl>
+    <cve>CVE-2026-41838</cve>
+    <cve>CVE-2026-59313</cve>
+    <cve>CVE-2026-41851</cve>
+    <cve>CVE-2026-41850</cve>
+    <cve>CVE-2026-41855</cve>
+    <cve>CVE-2026-47892</cve>
+    <cve>CVE-2026-47891</cve>
+    <cve>CVE-2026-47893</cve>
+    <cve>CVE-2026-41848</cve>
+    <cve>CVE-2026-59283</cve>
+    <cve>CVE-2026-41842</cve>
+    <cve>CVE-2026-59282</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      12 CVE id(s) against spring-messaging-6.1.21.jar, part of the Spring Framework release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework/spring-messaging@6.1.21</packageUrl>
+    <cve>CVE-2026-41838</cve>
+    <cve>CVE-2026-59313</cve>
+    <cve>CVE-2026-41851</cve>
+    <cve>CVE-2026-41850</cve>
+    <cve>CVE-2026-41855</cve>
+    <cve>CVE-2026-47892</cve>
+    <cve>CVE-2026-47891</cve>
+    <cve>CVE-2026-47893</cve>
+    <cve>CVE-2026-41848</cve>
+    <cve>CVE-2026-59283</cve>
+    <cve>CVE-2026-41842</cve>
+    <cve>CVE-2026-59282</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      12 CVE id(s) against spring-orm-6.1.21.jar, part of the Spring Framework release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework/spring-orm@6.1.21</packageUrl>
+    <cve>CVE-2026-41838</cve>
+    <cve>CVE-2026-59313</cve>
+    <cve>CVE-2026-41851</cve>
+    <cve>CVE-2026-41850</cve>
+    <cve>CVE-2026-41855</cve>
+    <cve>CVE-2026-47892</cve>
+    <cve>CVE-2026-47891</cve>
+    <cve>CVE-2026-47893</cve>
+    <cve>CVE-2026-41848</cve>
+    <cve>CVE-2026-59283</cve>
+    <cve>CVE-2026-41842</cve>
+    <cve>CVE-2026-59282</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      12 CVE id(s) against spring-oxm-6.1.21.jar, part of the Spring Framework release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework/spring-oxm@6.1.21</packageUrl>
+    <cve>CVE-2026-41838</cve>
+    <cve>CVE-2026-59313</cve>
+    <cve>CVE-2026-41851</cve>
+    <cve>CVE-2026-41850</cve>
+    <cve>CVE-2026-41855</cve>
+    <cve>CVE-2026-47892</cve>
+    <cve>CVE-2026-47891</cve>
+    <cve>CVE-2026-47893</cve>
+    <cve>CVE-2026-41848</cve>
+    <cve>CVE-2026-59283</cve>
+    <cve>CVE-2026-41842</cve>
+    <cve>CVE-2026-59282</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      12 CVE id(s) against spring-tx-6.1.21.jar, part of the Spring Framework release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework/spring-tx@6.1.21</packageUrl>
+    <cve>CVE-2026-41838</cve>
+    <cve>CVE-2026-59313</cve>
+    <cve>CVE-2026-41851</cve>
+    <cve>CVE-2026-41850</cve>
+    <cve>CVE-2026-41855</cve>
+    <cve>CVE-2026-47892</cve>
+    <cve>CVE-2026-47891</cve>
+    <cve>CVE-2026-47893</cve>
+    <cve>CVE-2026-41848</cve>
+    <cve>CVE-2026-59283</cve>
+    <cve>CVE-2026-41842</cve>
+    <cve>CVE-2026-59282</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      12 CVE id(s) against spring-web-6.1.21.jar, part of the Spring Framework release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework/spring-web@6.1.21</packageUrl>
+    <cve>CVE-2026-41838</cve>
+    <cve>CVE-2026-59313</cve>
+    <cve>CVE-2026-41851</cve>
+    <cve>CVE-2026-41850</cve>
+    <cve>CVE-2026-41855</cve>
+    <cve>CVE-2026-47892</cve>
+    <cve>CVE-2026-47891</cve>
+    <cve>CVE-2026-47893</cve>
+    <cve>CVE-2026-41848</cve>
+    <cve>CVE-2026-59283</cve>
+    <cve>CVE-2026-41842</cve>
+    <cve>CVE-2026-59282</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      12 CVE id(s) against spring-webflux-6.1.21.jar, part of the Spring Framework release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework/spring-webflux@6.1.21</packageUrl>
+    <cve>CVE-2026-41838</cve>
+    <cve>CVE-2026-59313</cve>
+    <cve>CVE-2026-41851</cve>
+    <cve>CVE-2026-41850</cve>
+    <cve>CVE-2026-41855</cve>
+    <cve>CVE-2026-47892</cve>
+    <cve>CVE-2026-47891</cve>
+    <cve>CVE-2026-47893</cve>
+    <cve>CVE-2026-41848</cve>
+    <cve>CVE-2026-59283</cve>
+    <cve>CVE-2026-41842</cve>
+    <cve>CVE-2026-59282</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      12 CVE id(s) against spring-webmvc-6.1.21.jar, part of the Spring Framework release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework/spring-webmvc@6.1.21</packageUrl>
+    <cve>CVE-2026-41838</cve>
+    <cve>CVE-2026-59313</cve>
+    <cve>CVE-2026-41851</cve>
+    <cve>CVE-2026-41850</cve>
+    <cve>CVE-2026-41855</cve>
+    <cve>CVE-2026-47892</cve>
+    <cve>CVE-2026-47891</cve>
+    <cve>CVE-2026-47893</cve>
+    <cve>CVE-2026-41848</cve>
+    <cve>CVE-2026-59283</cve>
+    <cve>CVE-2026-41842</cve>
+    <cve>CVE-2026-59282</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      12 CVE id(s) against spring-websocket-6.1.21.jar, part of the Spring Framework release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework/spring-websocket@6.1.21</packageUrl>
+    <cve>CVE-2026-41838</cve>
+    <cve>CVE-2026-59313</cve>
+    <cve>CVE-2026-41851</cve>
+    <cve>CVE-2026-41850</cve>
+    <cve>CVE-2026-41855</cve>
+    <cve>CVE-2026-47892</cve>
+    <cve>CVE-2026-47891</cve>
+    <cve>CVE-2026-47893</cve>
+    <cve>CVE-2026-41848</cve>
+    <cve>CVE-2026-59283</cve>
+    <cve>CVE-2026-41842</cve>
+    <cve>CVE-2026-59282</cve>
+  </suppress>
+
+  <!-- ===== Spring Boot @ 3.3.13 — 5 CVE id(s) per artifact ===== -->
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      5 CVE id(s) against spring-boot-3.3.13.jar, part of the Spring Boot release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework.boot/spring-boot@3.3.13</packageUrl>
+    <cve>CVE-2026-40972</cve>
+    <cve>CVE-2026-40975</cve>
+    <cve>CVE-2026-22733</cve>
+    <cve>CVE-2026-40973</cve>
+    <cve>CVE-2026-40974</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      5 CVE id(s) against spring-boot-actuator-3.3.13.jar, part of the Spring Boot release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework.boot/spring-boot-actuator@3.3.13</packageUrl>
+    <cve>CVE-2026-40972</cve>
+    <cve>CVE-2026-40975</cve>
+    <cve>CVE-2026-22733</cve>
+    <cve>CVE-2026-40973</cve>
+    <cve>CVE-2026-40974</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      5 CVE id(s) against spring-boot-actuator-autoconfigure-3.3.13.jar, part of the Spring Boot release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework.boot/spring-boot-actuator-autoconfigure@3.3.13</packageUrl>
+    <cve>CVE-2026-40972</cve>
+    <cve>CVE-2026-40975</cve>
+    <cve>CVE-2026-22733</cve>
+    <cve>CVE-2026-40973</cve>
+    <cve>CVE-2026-40974</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      5 CVE id(s) against spring-boot-autoconfigure-3.3.13.jar, part of the Spring Boot release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework.boot/spring-boot-autoconfigure@3.3.13</packageUrl>
+    <cve>CVE-2026-40972</cve>
+    <cve>CVE-2026-40975</cve>
+    <cve>CVE-2026-22733</cve>
+    <cve>CVE-2026-40973</cve>
+    <cve>CVE-2026-40974</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      5 CVE id(s) against spring-boot-starter-3.3.13.jar, part of the Spring Boot release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework.boot/spring-boot-starter@3.3.13</packageUrl>
+    <cve>CVE-2026-40972</cve>
+    <cve>CVE-2026-40975</cve>
+    <cve>CVE-2026-22733</cve>
+    <cve>CVE-2026-40973</cve>
+    <cve>CVE-2026-40974</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      5 CVE id(s) against spring-boot-starter-actuator-3.3.13.jar, part of the Spring Boot release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework.boot/spring-boot-starter-actuator@3.3.13</packageUrl>
+    <cve>CVE-2026-40972</cve>
+    <cve>CVE-2026-40975</cve>
+    <cve>CVE-2026-22733</cve>
+    <cve>CVE-2026-40973</cve>
+    <cve>CVE-2026-40974</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      5 CVE id(s) against spring-boot-starter-aop-3.3.13.jar, part of the Spring Boot release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework.boot/spring-boot-starter-aop@3.3.13</packageUrl>
+    <cve>CVE-2026-40972</cve>
+    <cve>CVE-2026-40975</cve>
+    <cve>CVE-2026-22733</cve>
+    <cve>CVE-2026-40973</cve>
+    <cve>CVE-2026-40974</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      5 CVE id(s) against spring-boot-starter-cache-3.3.13.jar, part of the Spring Boot release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework.boot/spring-boot-starter-cache@3.3.13</packageUrl>
+    <cve>CVE-2026-40972</cve>
+    <cve>CVE-2026-40975</cve>
+    <cve>CVE-2026-22733</cve>
+    <cve>CVE-2026-40973</cve>
+    <cve>CVE-2026-40974</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      5 CVE id(s) against spring-boot-starter-data-jpa-3.3.13.jar, part of the Spring Boot release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework.boot/spring-boot-starter-data-jpa@3.3.13</packageUrl>
+    <cve>CVE-2026-40972</cve>
+    <cve>CVE-2026-40975</cve>
+    <cve>CVE-2026-22733</cve>
+    <cve>CVE-2026-40973</cve>
+    <cve>CVE-2026-40974</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      5 CVE id(s) against spring-boot-starter-data-redis-3.3.13.jar, part of the Spring Boot release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework.boot/spring-boot-starter-data-redis@3.3.13</packageUrl>
+    <cve>CVE-2026-40972</cve>
+    <cve>CVE-2026-40975</cve>
+    <cve>CVE-2026-22733</cve>
+    <cve>CVE-2026-40973</cve>
+    <cve>CVE-2026-40974</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      5 CVE id(s) against spring-boot-starter-data-redis-reactive-3.3.13.jar, part of the Spring Boot release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework.boot/spring-boot-starter-data-redis-reactive@3.3.13</packageUrl>
+    <cve>CVE-2026-40972</cve>
+    <cve>CVE-2026-40975</cve>
+    <cve>CVE-2026-22733</cve>
+    <cve>CVE-2026-40973</cve>
+    <cve>CVE-2026-40974</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      5 CVE id(s) against spring-boot-starter-jdbc-3.3.13.jar, part of the Spring Boot release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework.boot/spring-boot-starter-jdbc@3.3.13</packageUrl>
+    <cve>CVE-2026-40972</cve>
+    <cve>CVE-2026-40975</cve>
+    <cve>CVE-2026-22733</cve>
+    <cve>CVE-2026-40973</cve>
+    <cve>CVE-2026-40974</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      5 CVE id(s) against spring-boot-starter-json-3.3.13.jar, part of the Spring Boot release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework.boot/spring-boot-starter-json@3.3.13</packageUrl>
+    <cve>CVE-2026-40972</cve>
+    <cve>CVE-2026-40975</cve>
+    <cve>CVE-2026-22733</cve>
+    <cve>CVE-2026-40973</cve>
+    <cve>CVE-2026-40974</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      5 CVE id(s) against spring-boot-starter-logging-3.3.13.jar, part of the Spring Boot release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework.boot/spring-boot-starter-logging@3.3.13</packageUrl>
+    <cve>CVE-2026-40972</cve>
+    <cve>CVE-2026-40975</cve>
+    <cve>CVE-2026-22733</cve>
+    <cve>CVE-2026-40973</cve>
+    <cve>CVE-2026-40974</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      5 CVE id(s) against spring-boot-starter-reactor-netty-3.3.13.jar, part of the Spring Boot release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework.boot/spring-boot-starter-reactor-netty@3.3.13</packageUrl>
+    <cve>CVE-2026-40972</cve>
+    <cve>CVE-2026-40975</cve>
+    <cve>CVE-2026-22733</cve>
+    <cve>CVE-2026-40973</cve>
+    <cve>CVE-2026-40974</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      5 CVE id(s) against spring-boot-starter-security-3.3.13.jar, part of the Spring Boot release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework.boot/spring-boot-starter-security@3.3.13</packageUrl>
+    <cve>CVE-2026-40972</cve>
+    <cve>CVE-2026-40975</cve>
+    <cve>CVE-2026-22733</cve>
+    <cve>CVE-2026-40973</cve>
+    <cve>CVE-2026-40974</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      5 CVE id(s) against spring-boot-starter-tomcat-3.3.13.jar, part of the Spring Boot release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework.boot/spring-boot-starter-tomcat@3.3.13</packageUrl>
+    <cve>CVE-2026-40972</cve>
+    <cve>CVE-2026-40975</cve>
+    <cve>CVE-2026-22733</cve>
+    <cve>CVE-2026-40973</cve>
+    <cve>CVE-2026-40974</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      5 CVE id(s) against spring-boot-starter-validation-3.3.13.jar, part of the Spring Boot release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework.boot/spring-boot-starter-validation@3.3.13</packageUrl>
+    <cve>CVE-2026-40972</cve>
+    <cve>CVE-2026-40975</cve>
+    <cve>CVE-2026-22733</cve>
+    <cve>CVE-2026-40973</cve>
+    <cve>CVE-2026-40974</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      5 CVE id(s) against spring-boot-starter-web-3.3.13.jar, part of the Spring Boot release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework.boot/spring-boot-starter-web@3.3.13</packageUrl>
+    <cve>CVE-2026-40972</cve>
+    <cve>CVE-2026-40975</cve>
+    <cve>CVE-2026-22733</cve>
+    <cve>CVE-2026-40973</cve>
+    <cve>CVE-2026-40974</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      5 CVE id(s) against spring-boot-starter-webflux-3.3.13.jar, part of the Spring Boot release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework.boot/spring-boot-starter-webflux@3.3.13</packageUrl>
+    <cve>CVE-2026-40972</cve>
+    <cve>CVE-2026-40975</cve>
+    <cve>CVE-2026-22733</cve>
+    <cve>CVE-2026-40973</cve>
+    <cve>CVE-2026-40974</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      5 CVE id(s) against spring-boot-starter-websocket-3.3.13.jar, part of the Spring Boot release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework.boot/spring-boot-starter-websocket@3.3.13</packageUrl>
+    <cve>CVE-2026-40972</cve>
+    <cve>CVE-2026-40975</cve>
+    <cve>CVE-2026-22733</cve>
+    <cve>CVE-2026-40973</cve>
+    <cve>CVE-2026-40974</cve>
+  </suppress>
+
+  <!-- ===== Spring Security @ 6.3.10 — 3 CVE id(s) per artifact ===== -->
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      3 CVE id(s) against spring-security-config-6.3.10.jar, part of the Spring Security release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework.security/spring-security-config@6.3.10</packageUrl>
+    <cve>CVE-2026-40988</cve>
+    <cve>CVE-2026-47838</cve>
+    <cve>CVE-2026-22732</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      3 CVE id(s) against spring-security-core-6.3.10.jar, part of the Spring Security release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework.security/spring-security-core@6.3.10</packageUrl>
+    <cve>CVE-2026-40988</cve>
+    <cve>CVE-2026-47838</cve>
+    <cve>CVE-2026-22732</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      3 CVE id(s) against spring-security-crypto-6.3.10.jar, part of the Spring Security release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework.security/spring-security-crypto@6.3.10</packageUrl>
+    <cve>CVE-2026-40988</cve>
+    <cve>CVE-2026-47838</cve>
+    <cve>CVE-2026-22732</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      3 CVE id(s) against spring-security-web-6.3.10.jar, part of the Spring Security release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.springframework.security/spring-security-web@6.3.10</packageUrl>
+    <cve>CVE-2026-40988</cve>
+    <cve>CVE-2026-47838</cve>
+    <cve>CVE-2026-22732</cve>
+  </suppress>
+
+  <!-- ===== Netty @ 4.1.122.Final — 41 CVE id(s) per artifact ===== -->
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      41 CVE id(s) against netty-buffer-4.1.122.Final.jar, part of the Netty release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/io.netty/netty-buffer@4.1.122.Final</packageUrl>
     <cve>CVE-2026-44893</cve>
     <cve>CVE-2026-44250</cve>
     <cve>CVE-2026-48059</cve>
@@ -92,170 +837,573 @@
     <cve>CVE-2026-42579</cve>
   </suppress>
 
-  <!-- spring-boot-starter-3.3.13.jar (sibling of spring-boot / -starter-web / -starter-data-jpa) -->
   <suppress until="2026-12-04Z">
     <notes><![CDATA[
-      Same 5 CVEs as spring-boot-3.3.13.jar (spring-boot-starter is a sibling
-      artifact of the same release) - see that entry's notes.
-      review-by: 2026-12-04
+      41 CVE id(s) against netty-codec-4.1.122.Final.jar, part of the Netty release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
     ]]></notes>
-    <packageUrl>pkg:maven/org.springframework.boot/spring-boot-starter@3.3.13</packageUrl>
-    <cve>CVE-2026-40972</cve>
-    <cve>CVE-2026-40975</cve>
-    <cve>CVE-2026-22733</cve>
-    <cve>CVE-2026-40973</cve>
-    <cve>CVE-2026-40974</cve>
+    <packageUrl>pkg:maven/io.netty/netty-codec@4.1.122.Final</packageUrl>
+    <cve>CVE-2026-44893</cve>
+    <cve>CVE-2026-44250</cve>
+    <cve>CVE-2026-48059</cve>
+    <cve>CVE-2026-44890</cve>
+    <cve>CVE-2026-44891</cve>
+    <cve>CVE-2026-50011</cve>
+    <cve>CVE-2026-59901</cve>
+    <cve>CVE-2026-42587</cve>
+    <cve>CVE-2026-42586</cve>
+    <cve>CVE-2026-44248</cve>
+    <cve>CVE-2025-58056</cve>
+    <cve>CVE-2026-44249</cve>
+    <cve>CVE-2025-58057</cve>
+    <cve>CVE-2026-45416</cve>
+    <cve>CVE-2026-45674</cve>
+    <cve>CVE-2026-56745</cve>
+    <cve>CVE-2026-56822</cve>
+    <cve>CVE-2026-56821</cve>
+    <cve>CVE-2026-47691</cve>
+    <cve>CVE-2026-56820</cve>
+    <cve>CVE-2026-50010</cve>
+    <cve>CVE-2026-56819</cve>
+    <cve>CVE-2026-56817</cve>
+    <cve>CVE-2026-62380</cve>
+    <cve>CVE-2026-59898</cve>
+    <cve>CVE-2026-59899</cve>
+    <cve>CVE-2026-55851</cve>
+    <cve>CVE-2025-55163</cve>
+    <cve>CVE-2026-42581</cve>
+    <cve>CVE-2026-48006</cve>
+    <cve>CVE-2026-42585</cve>
+    <cve>CVE-2026-42584</cve>
+    <cve>CVE-2026-46340</cve>
+    <cve>CVE-2026-42583</cve>
+    <cve>CVE-2026-48043</cve>
+    <cve>CVE-2026-55833</cve>
+    <cve>CVE-2026-55831</cve>
+    <cve>CVE-2026-33871</cve>
+    <cve>CVE-2026-33870</cve>
+    <cve>CVE-2026-42578</cve>
+    <cve>CVE-2026-42579</cve>
   </suppress>
 
-  <!-- spring-security-config-6.3.10.jar (sibling of spring-security-core/web) -->
   <suppress until="2026-12-04Z">
     <notes><![CDATA[
-      Same 3 CVEs as spring-security-core-6.3.10.jar (spring-security-config is
-      a sibling artifact of the same release) - see that entry's notes.
-      review-by: 2026-12-04
+      41 CVE id(s) against netty-codec-dns-4.1.122.Final.jar, part of the Netty release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
     ]]></notes>
-    <packageUrl>pkg:maven/org.springframework.security/spring-security-config@6.3.10</packageUrl>
-    <cve>CVE-2026-40988</cve>
-    <cve>CVE-2026-47838</cve>
-    <cve>CVE-2026-22732</cve>
+    <packageUrl>pkg:maven/io.netty/netty-codec-dns@4.1.122.Final</packageUrl>
+    <cve>CVE-2026-44893</cve>
+    <cve>CVE-2026-44250</cve>
+    <cve>CVE-2026-48059</cve>
+    <cve>CVE-2026-44890</cve>
+    <cve>CVE-2026-44891</cve>
+    <cve>CVE-2026-50011</cve>
+    <cve>CVE-2026-59901</cve>
+    <cve>CVE-2026-42587</cve>
+    <cve>CVE-2026-42586</cve>
+    <cve>CVE-2026-44248</cve>
+    <cve>CVE-2025-58056</cve>
+    <cve>CVE-2026-44249</cve>
+    <cve>CVE-2025-58057</cve>
+    <cve>CVE-2026-45416</cve>
+    <cve>CVE-2026-45674</cve>
+    <cve>CVE-2026-56745</cve>
+    <cve>CVE-2026-56822</cve>
+    <cve>CVE-2026-56821</cve>
+    <cve>CVE-2026-47691</cve>
+    <cve>CVE-2026-56820</cve>
+    <cve>CVE-2026-50010</cve>
+    <cve>CVE-2026-56819</cve>
+    <cve>CVE-2026-56817</cve>
+    <cve>CVE-2026-62380</cve>
+    <cve>CVE-2026-59898</cve>
+    <cve>CVE-2026-59899</cve>
+    <cve>CVE-2026-55851</cve>
+    <cve>CVE-2025-55163</cve>
+    <cve>CVE-2026-42581</cve>
+    <cve>CVE-2026-48006</cve>
+    <cve>CVE-2026-42585</cve>
+    <cve>CVE-2026-42584</cve>
+    <cve>CVE-2026-46340</cve>
+    <cve>CVE-2026-42583</cve>
+    <cve>CVE-2026-48043</cve>
+    <cve>CVE-2026-55833</cve>
+    <cve>CVE-2026-55831</cve>
+    <cve>CVE-2026-33871</cve>
+    <cve>CVE-2026-33870</cve>
+    <cve>CVE-2026-42578</cve>
+    <cve>CVE-2026-42579</cve>
   </suppress>
 
-  <!-- angus-activation-2.0.2.jar -->
   <suppress until="2026-12-04Z">
     <notes><![CDATA[
-      CVE-2025-7962 against angus-activation-2.0.2.jar.
-      No newer release of this artifact exists in the public registry as of
-      2026-09-05 that addresses this advisory. review-by: 2026-12-04
+      41 CVE id(s) against netty-codec-http-4.1.122.Final.jar, part of the Netty release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
     ]]></notes>
-    <packageUrl>pkg:maven/org.eclipse.angus/angus-activation@2.0.2</packageUrl>
-    <cve>CVE-2025-7962</cve>
+    <packageUrl>pkg:maven/io.netty/netty-codec-http@4.1.122.Final</packageUrl>
+    <cve>CVE-2026-44893</cve>
+    <cve>CVE-2026-44250</cve>
+    <cve>CVE-2026-48059</cve>
+    <cve>CVE-2026-44890</cve>
+    <cve>CVE-2026-44891</cve>
+    <cve>CVE-2026-50011</cve>
+    <cve>CVE-2026-59901</cve>
+    <cve>CVE-2026-42587</cve>
+    <cve>CVE-2026-42586</cve>
+    <cve>CVE-2026-44248</cve>
+    <cve>CVE-2025-58056</cve>
+    <cve>CVE-2026-44249</cve>
+    <cve>CVE-2025-58057</cve>
+    <cve>CVE-2026-45416</cve>
+    <cve>CVE-2026-45674</cve>
+    <cve>CVE-2026-56745</cve>
+    <cve>CVE-2026-56822</cve>
+    <cve>CVE-2026-56821</cve>
+    <cve>CVE-2026-47691</cve>
+    <cve>CVE-2026-56820</cve>
+    <cve>CVE-2026-50010</cve>
+    <cve>CVE-2026-56819</cve>
+    <cve>CVE-2026-56817</cve>
+    <cve>CVE-2026-62380</cve>
+    <cve>CVE-2026-59898</cve>
+    <cve>CVE-2026-59899</cve>
+    <cve>CVE-2026-55851</cve>
+    <cve>CVE-2025-55163</cve>
+    <cve>CVE-2026-42581</cve>
+    <cve>CVE-2026-48006</cve>
+    <cve>CVE-2026-42585</cve>
+    <cve>CVE-2026-42584</cve>
+    <cve>CVE-2026-46340</cve>
+    <cve>CVE-2026-42583</cve>
+    <cve>CVE-2026-48043</cve>
+    <cve>CVE-2026-55833</cve>
+    <cve>CVE-2026-55831</cve>
+    <cve>CVE-2026-33871</cve>
+    <cve>CVE-2026-33870</cve>
+    <cve>CVE-2026-42578</cve>
+    <cve>CVE-2026-42579</cve>
   </suppress>
 
-  <!-- jackson-databind-2.17.3.jar -->
   <suppress until="2026-12-04Z">
     <notes><![CDATA[
-      CVE-2026-54512 against jackson-databind-2.17.3.jar.
-      No newer release of this artifact exists in the public registry as of
-      2026-09-05 that addresses this advisory. review-by: 2026-12-04
+      41 CVE id(s) against netty-codec-http2-4.1.122.Final.jar, part of the Netty release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
     ]]></notes>
-    <packageUrl>pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.17.3</packageUrl>
-    <cve>CVE-2026-54512</cve>
-  </suppress>
-  <suppress until="2026-12-04Z">
-    <notes><![CDATA[
-      CVE-2026-54513 against jackson-databind-2.17.3.jar.
-      No newer release of this artifact exists in the public registry as of
-      2026-09-05 that addresses this advisory. review-by: 2026-12-04
-    ]]></notes>
-    <packageUrl>pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.17.3</packageUrl>
-    <cve>CVE-2026-54513</cve>
-  </suppress>
-
-  <!-- kafka-clients-3.7.2.jar -->
-  <suppress until="2026-12-04Z">
-    <notes><![CDATA[
-      CVE-2026-35554 against kafka-clients-3.7.2.jar.
-      No newer release of this artifact exists in the public registry as of
-      2026-09-05 that addresses this advisory. review-by: 2026-12-04
-    ]]></notes>
-    <packageUrl>pkg:maven/org.apache.kafka/kafka-clients@3.7.2</packageUrl>
-    <cve>CVE-2026-35554</cve>
-  </suppress>
-  <suppress until="2026-12-04Z">
-    <notes><![CDATA[
-      CVE-2025-27817 against kafka-clients-3.7.2.jar.
-      No newer release of this artifact exists in the public registry as of
-      2026-09-05 that addresses this advisory. review-by: 2026-12-04
-    ]]></notes>
-    <packageUrl>pkg:maven/org.apache.kafka/kafka-clients@3.7.2</packageUrl>
-    <cve>CVE-2025-27817</cve>
-  </suppress>
-  <suppress until="2026-12-04Z">
-    <notes><![CDATA[
-      CVE-2025-27818 against kafka-clients-3.7.2.jar.
-      No newer release of this artifact exists in the public registry as of
-      2026-09-05 that addresses this advisory. review-by: 2026-12-04
-    ]]></notes>
-    <packageUrl>pkg:maven/org.apache.kafka/kafka-clients@3.7.2</packageUrl>
-    <cve>CVE-2025-27818</cve>
-  </suppress>
-
-  <!-- kotlin-stdlib-1.9.25.jar -->
-  <suppress until="2026-12-04Z">
-    <notes><![CDATA[
-      CVE-2026-53914 against kotlin-stdlib-1.9.25.jar.
-      No newer release of this artifact exists in the public registry as of
-      2026-09-05 that addresses this advisory. review-by: 2026-12-04
-    ]]></notes>
-    <packageUrl>pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@1.9.25</packageUrl>
-    <cve>CVE-2026-53914</cve>
+    <packageUrl>pkg:maven/io.netty/netty-codec-http2@4.1.122.Final</packageUrl>
+    <cve>CVE-2026-44893</cve>
+    <cve>CVE-2026-44250</cve>
+    <cve>CVE-2026-48059</cve>
+    <cve>CVE-2026-44890</cve>
+    <cve>CVE-2026-44891</cve>
+    <cve>CVE-2026-50011</cve>
+    <cve>CVE-2026-59901</cve>
+    <cve>CVE-2026-42587</cve>
+    <cve>CVE-2026-42586</cve>
+    <cve>CVE-2026-44248</cve>
+    <cve>CVE-2025-58056</cve>
+    <cve>CVE-2026-44249</cve>
+    <cve>CVE-2025-58057</cve>
+    <cve>CVE-2026-45416</cve>
+    <cve>CVE-2026-45674</cve>
+    <cve>CVE-2026-56745</cve>
+    <cve>CVE-2026-56822</cve>
+    <cve>CVE-2026-56821</cve>
+    <cve>CVE-2026-47691</cve>
+    <cve>CVE-2026-56820</cve>
+    <cve>CVE-2026-50010</cve>
+    <cve>CVE-2026-56819</cve>
+    <cve>CVE-2026-56817</cve>
+    <cve>CVE-2026-62380</cve>
+    <cve>CVE-2026-59898</cve>
+    <cve>CVE-2026-59899</cve>
+    <cve>CVE-2026-55851</cve>
+    <cve>CVE-2025-55163</cve>
+    <cve>CVE-2026-42581</cve>
+    <cve>CVE-2026-48006</cve>
+    <cve>CVE-2026-42585</cve>
+    <cve>CVE-2026-42584</cve>
+    <cve>CVE-2026-46340</cve>
+    <cve>CVE-2026-42583</cve>
+    <cve>CVE-2026-48043</cve>
+    <cve>CVE-2026-55833</cve>
+    <cve>CVE-2026-55831</cve>
+    <cve>CVE-2026-33871</cve>
+    <cve>CVE-2026-33870</cve>
+    <cve>CVE-2026-42578</cve>
+    <cve>CVE-2026-42579</cve>
   </suppress>
 
-  <!-- log4j-api-2.23.1.jar -->
   <suppress until="2026-12-04Z">
     <notes><![CDATA[
-      CVE-2026-34478 against log4j-api-2.23.1.jar.
-      No newer release of this artifact exists in the public registry as of
-      2026-09-05 that addresses this advisory. review-by: 2026-12-04
+      41 CVE id(s) against netty-codec-socks-4.1.122.Final.jar, part of the Netty release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
     ]]></notes>
-    <packageUrl>pkg:maven/org.apache.logging.log4j/log4j-api@2.23.1</packageUrl>
-    <cve>CVE-2026-34478</cve>
-  </suppress>
-  <suppress until="2026-12-04Z">
-    <notes><![CDATA[
-      CVE-2026-34479 against log4j-api-2.23.1.jar.
-      No newer release of this artifact exists in the public registry as of
-      2026-09-05 that addresses this advisory. review-by: 2026-12-04
-    ]]></notes>
-    <packageUrl>pkg:maven/org.apache.logging.log4j/log4j-api@2.23.1</packageUrl>
-    <cve>CVE-2026-34479</cve>
-  </suppress>
-  <suppress until="2026-12-04Z">
-    <notes><![CDATA[
-      CVE-2026-34480 against log4j-api-2.23.1.jar.
-      No newer release of this artifact exists in the public registry as of
-      2026-09-05 that addresses this advisory. review-by: 2026-12-04
-    ]]></notes>
-    <packageUrl>pkg:maven/org.apache.logging.log4j/log4j-api@2.23.1</packageUrl>
-    <cve>CVE-2026-34480</cve>
-  </suppress>
-  <suppress until="2026-12-04Z">
-    <notes><![CDATA[
-      CVE-2026-34481 against log4j-api-2.23.1.jar.
-      No newer release of this artifact exists in the public registry as of
-      2026-09-05 that addresses this advisory. review-by: 2026-12-04
-    ]]></notes>
-    <packageUrl>pkg:maven/org.apache.logging.log4j/log4j-api@2.23.1</packageUrl>
-    <cve>CVE-2026-34481</cve>
+    <packageUrl>pkg:maven/io.netty/netty-codec-socks@4.1.122.Final</packageUrl>
+    <cve>CVE-2026-44893</cve>
+    <cve>CVE-2026-44250</cve>
+    <cve>CVE-2026-48059</cve>
+    <cve>CVE-2026-44890</cve>
+    <cve>CVE-2026-44891</cve>
+    <cve>CVE-2026-50011</cve>
+    <cve>CVE-2026-59901</cve>
+    <cve>CVE-2026-42587</cve>
+    <cve>CVE-2026-42586</cve>
+    <cve>CVE-2026-44248</cve>
+    <cve>CVE-2025-58056</cve>
+    <cve>CVE-2026-44249</cve>
+    <cve>CVE-2025-58057</cve>
+    <cve>CVE-2026-45416</cve>
+    <cve>CVE-2026-45674</cve>
+    <cve>CVE-2026-56745</cve>
+    <cve>CVE-2026-56822</cve>
+    <cve>CVE-2026-56821</cve>
+    <cve>CVE-2026-47691</cve>
+    <cve>CVE-2026-56820</cve>
+    <cve>CVE-2026-50010</cve>
+    <cve>CVE-2026-56819</cve>
+    <cve>CVE-2026-56817</cve>
+    <cve>CVE-2026-62380</cve>
+    <cve>CVE-2026-59898</cve>
+    <cve>CVE-2026-59899</cve>
+    <cve>CVE-2026-55851</cve>
+    <cve>CVE-2025-55163</cve>
+    <cve>CVE-2026-42581</cve>
+    <cve>CVE-2026-48006</cve>
+    <cve>CVE-2026-42585</cve>
+    <cve>CVE-2026-42584</cve>
+    <cve>CVE-2026-46340</cve>
+    <cve>CVE-2026-42583</cve>
+    <cve>CVE-2026-48043</cve>
+    <cve>CVE-2026-55833</cve>
+    <cve>CVE-2026-55831</cve>
+    <cve>CVE-2026-33871</cve>
+    <cve>CVE-2026-33870</cve>
+    <cve>CVE-2026-42578</cve>
+    <cve>CVE-2026-42579</cve>
   </suppress>
 
-  <!-- micrometer-registry-prometheus-1.13.15.jar -->
   <suppress until="2026-12-04Z">
     <notes><![CDATA[
-      CVE-2026-42154 against micrometer-registry-prometheus-1.13.15.jar.
-      No newer release of this artifact exists in the public registry as of
-      2026-09-05 that addresses this advisory. review-by: 2026-12-04
+      41 CVE id(s) against netty-common-4.1.122.Final.jar, part of the Netty release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
     ]]></notes>
-    <packageUrl>pkg:maven/io.micrometer/micrometer-registry-prometheus@1.13.15</packageUrl>
-    <cve>CVE-2026-42154</cve>
+    <packageUrl>pkg:maven/io.netty/netty-common@4.1.122.Final</packageUrl>
+    <cve>CVE-2026-44893</cve>
+    <cve>CVE-2026-44250</cve>
+    <cve>CVE-2026-48059</cve>
+    <cve>CVE-2026-44890</cve>
+    <cve>CVE-2026-44891</cve>
+    <cve>CVE-2026-50011</cve>
+    <cve>CVE-2026-59901</cve>
+    <cve>CVE-2026-42587</cve>
+    <cve>CVE-2026-42586</cve>
+    <cve>CVE-2026-44248</cve>
+    <cve>CVE-2025-58056</cve>
+    <cve>CVE-2026-44249</cve>
+    <cve>CVE-2025-58057</cve>
+    <cve>CVE-2026-45416</cve>
+    <cve>CVE-2026-45674</cve>
+    <cve>CVE-2026-56745</cve>
+    <cve>CVE-2026-56822</cve>
+    <cve>CVE-2026-56821</cve>
+    <cve>CVE-2026-47691</cve>
+    <cve>CVE-2026-56820</cve>
+    <cve>CVE-2026-50010</cve>
+    <cve>CVE-2026-56819</cve>
+    <cve>CVE-2026-56817</cve>
+    <cve>CVE-2026-62380</cve>
+    <cve>CVE-2026-59898</cve>
+    <cve>CVE-2026-59899</cve>
+    <cve>CVE-2026-55851</cve>
+    <cve>CVE-2025-55163</cve>
+    <cve>CVE-2026-42581</cve>
+    <cve>CVE-2026-48006</cve>
+    <cve>CVE-2026-42585</cve>
+    <cve>CVE-2026-42584</cve>
+    <cve>CVE-2026-46340</cve>
+    <cve>CVE-2026-42583</cve>
+    <cve>CVE-2026-48043</cve>
+    <cve>CVE-2026-55833</cve>
+    <cve>CVE-2026-55831</cve>
+    <cve>CVE-2026-33871</cve>
+    <cve>CVE-2026-33870</cve>
+    <cve>CVE-2026-42578</cve>
+    <cve>CVE-2026-42579</cve>
   </suppress>
 
-  <!-- netty-transport-4.1.122.Final.jar -->
   <suppress until="2026-12-04Z">
     <notes><![CDATA[
-      41 CVE ids against netty-transport-4.1.122.Final.jar (CVE-2026-44893,
-      CVE-2026-44250, CVE-2026-48059, CVE-2026-44890, CVE-2026-44891,
-      CVE-2026-50011, CVE-2026-59901, CVE-2026-42587, CVE-2026-42586,
-      CVE-2026-44248, CVE-2025-58056, CVE-2026-44249, CVE-2025-58057,
-      CVE-2026-45416, CVE-2026-45674, CVE-2026-56745, CVE-2026-56822,
-      CVE-2026-56821, CVE-2026-47691, CVE-2026-56820, CVE-2026-50010,
-      CVE-2026-56819, CVE-2026-56817, CVE-2026-62380, CVE-2026-59898,
-      CVE-2026-59899, CVE-2026-55851, CVE-2025-55163, CVE-2026-42581,
-      CVE-2026-48006, CVE-2026-42585, CVE-2026-42584, CVE-2026-46340,
-      CVE-2026-42583, CVE-2026-48043, CVE-2026-55833, CVE-2026-55831,
-      CVE-2026-33871, CVE-2026-33870, CVE-2026-42578, CVE-2026-42579).
-      No newer release of this artifact exists in the public registry as of
-      2026-09-05 that addresses these advisories. review-by: 2026-12-04
+      41 CVE id(s) against netty-handler-4.1.122.Final.jar, part of the Netty release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/io.netty/netty-handler@4.1.122.Final</packageUrl>
+    <cve>CVE-2026-44893</cve>
+    <cve>CVE-2026-44250</cve>
+    <cve>CVE-2026-48059</cve>
+    <cve>CVE-2026-44890</cve>
+    <cve>CVE-2026-44891</cve>
+    <cve>CVE-2026-50011</cve>
+    <cve>CVE-2026-59901</cve>
+    <cve>CVE-2026-42587</cve>
+    <cve>CVE-2026-42586</cve>
+    <cve>CVE-2026-44248</cve>
+    <cve>CVE-2025-58056</cve>
+    <cve>CVE-2026-44249</cve>
+    <cve>CVE-2025-58057</cve>
+    <cve>CVE-2026-45416</cve>
+    <cve>CVE-2026-45674</cve>
+    <cve>CVE-2026-56745</cve>
+    <cve>CVE-2026-56822</cve>
+    <cve>CVE-2026-56821</cve>
+    <cve>CVE-2026-47691</cve>
+    <cve>CVE-2026-56820</cve>
+    <cve>CVE-2026-50010</cve>
+    <cve>CVE-2026-56819</cve>
+    <cve>CVE-2026-56817</cve>
+    <cve>CVE-2026-62380</cve>
+    <cve>CVE-2026-59898</cve>
+    <cve>CVE-2026-59899</cve>
+    <cve>CVE-2026-55851</cve>
+    <cve>CVE-2025-55163</cve>
+    <cve>CVE-2026-42581</cve>
+    <cve>CVE-2026-48006</cve>
+    <cve>CVE-2026-42585</cve>
+    <cve>CVE-2026-42584</cve>
+    <cve>CVE-2026-46340</cve>
+    <cve>CVE-2026-42583</cve>
+    <cve>CVE-2026-48043</cve>
+    <cve>CVE-2026-55833</cve>
+    <cve>CVE-2026-55831</cve>
+    <cve>CVE-2026-33871</cve>
+    <cve>CVE-2026-33870</cve>
+    <cve>CVE-2026-42578</cve>
+    <cve>CVE-2026-42579</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      41 CVE id(s) against netty-handler-proxy-4.1.122.Final.jar, part of the Netty release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/io.netty/netty-handler-proxy@4.1.122.Final</packageUrl>
+    <cve>CVE-2026-44893</cve>
+    <cve>CVE-2026-44250</cve>
+    <cve>CVE-2026-48059</cve>
+    <cve>CVE-2026-44890</cve>
+    <cve>CVE-2026-44891</cve>
+    <cve>CVE-2026-50011</cve>
+    <cve>CVE-2026-59901</cve>
+    <cve>CVE-2026-42587</cve>
+    <cve>CVE-2026-42586</cve>
+    <cve>CVE-2026-44248</cve>
+    <cve>CVE-2025-58056</cve>
+    <cve>CVE-2026-44249</cve>
+    <cve>CVE-2025-58057</cve>
+    <cve>CVE-2026-45416</cve>
+    <cve>CVE-2026-45674</cve>
+    <cve>CVE-2026-56745</cve>
+    <cve>CVE-2026-56822</cve>
+    <cve>CVE-2026-56821</cve>
+    <cve>CVE-2026-47691</cve>
+    <cve>CVE-2026-56820</cve>
+    <cve>CVE-2026-50010</cve>
+    <cve>CVE-2026-56819</cve>
+    <cve>CVE-2026-56817</cve>
+    <cve>CVE-2026-62380</cve>
+    <cve>CVE-2026-59898</cve>
+    <cve>CVE-2026-59899</cve>
+    <cve>CVE-2026-55851</cve>
+    <cve>CVE-2025-55163</cve>
+    <cve>CVE-2026-42581</cve>
+    <cve>CVE-2026-48006</cve>
+    <cve>CVE-2026-42585</cve>
+    <cve>CVE-2026-42584</cve>
+    <cve>CVE-2026-46340</cve>
+    <cve>CVE-2026-42583</cve>
+    <cve>CVE-2026-48043</cve>
+    <cve>CVE-2026-55833</cve>
+    <cve>CVE-2026-55831</cve>
+    <cve>CVE-2026-33871</cve>
+    <cve>CVE-2026-33870</cve>
+    <cve>CVE-2026-42578</cve>
+    <cve>CVE-2026-42579</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      41 CVE id(s) against netty-resolver-4.1.122.Final.jar, part of the Netty release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/io.netty/netty-resolver@4.1.122.Final</packageUrl>
+    <cve>CVE-2026-44893</cve>
+    <cve>CVE-2026-44250</cve>
+    <cve>CVE-2026-48059</cve>
+    <cve>CVE-2026-44890</cve>
+    <cve>CVE-2026-44891</cve>
+    <cve>CVE-2026-50011</cve>
+    <cve>CVE-2026-59901</cve>
+    <cve>CVE-2026-42587</cve>
+    <cve>CVE-2026-42586</cve>
+    <cve>CVE-2026-44248</cve>
+    <cve>CVE-2025-58056</cve>
+    <cve>CVE-2026-44249</cve>
+    <cve>CVE-2025-58057</cve>
+    <cve>CVE-2026-45416</cve>
+    <cve>CVE-2026-45674</cve>
+    <cve>CVE-2026-56745</cve>
+    <cve>CVE-2026-56822</cve>
+    <cve>CVE-2026-56821</cve>
+    <cve>CVE-2026-47691</cve>
+    <cve>CVE-2026-56820</cve>
+    <cve>CVE-2026-50010</cve>
+    <cve>CVE-2026-56819</cve>
+    <cve>CVE-2026-56817</cve>
+    <cve>CVE-2026-62380</cve>
+    <cve>CVE-2026-59898</cve>
+    <cve>CVE-2026-59899</cve>
+    <cve>CVE-2026-55851</cve>
+    <cve>CVE-2025-55163</cve>
+    <cve>CVE-2026-42581</cve>
+    <cve>CVE-2026-48006</cve>
+    <cve>CVE-2026-42585</cve>
+    <cve>CVE-2026-42584</cve>
+    <cve>CVE-2026-46340</cve>
+    <cve>CVE-2026-42583</cve>
+    <cve>CVE-2026-48043</cve>
+    <cve>CVE-2026-55833</cve>
+    <cve>CVE-2026-55831</cve>
+    <cve>CVE-2026-33871</cve>
+    <cve>CVE-2026-33870</cve>
+    <cve>CVE-2026-42578</cve>
+    <cve>CVE-2026-42579</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      41 CVE id(s) against netty-resolver-dns-4.1.122.Final.jar, part of the Netty release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/io.netty/netty-resolver-dns@4.1.122.Final</packageUrl>
+    <cve>CVE-2026-44893</cve>
+    <cve>CVE-2026-44250</cve>
+    <cve>CVE-2026-48059</cve>
+    <cve>CVE-2026-44890</cve>
+    <cve>CVE-2026-44891</cve>
+    <cve>CVE-2026-50011</cve>
+    <cve>CVE-2026-59901</cve>
+    <cve>CVE-2026-42587</cve>
+    <cve>CVE-2026-42586</cve>
+    <cve>CVE-2026-44248</cve>
+    <cve>CVE-2025-58056</cve>
+    <cve>CVE-2026-44249</cve>
+    <cve>CVE-2025-58057</cve>
+    <cve>CVE-2026-45416</cve>
+    <cve>CVE-2026-45674</cve>
+    <cve>CVE-2026-56745</cve>
+    <cve>CVE-2026-56822</cve>
+    <cve>CVE-2026-56821</cve>
+    <cve>CVE-2026-47691</cve>
+    <cve>CVE-2026-56820</cve>
+    <cve>CVE-2026-50010</cve>
+    <cve>CVE-2026-56819</cve>
+    <cve>CVE-2026-56817</cve>
+    <cve>CVE-2026-62380</cve>
+    <cve>CVE-2026-59898</cve>
+    <cve>CVE-2026-59899</cve>
+    <cve>CVE-2026-55851</cve>
+    <cve>CVE-2025-55163</cve>
+    <cve>CVE-2026-42581</cve>
+    <cve>CVE-2026-48006</cve>
+    <cve>CVE-2026-42585</cve>
+    <cve>CVE-2026-42584</cve>
+    <cve>CVE-2026-46340</cve>
+    <cve>CVE-2026-42583</cve>
+    <cve>CVE-2026-48043</cve>
+    <cve>CVE-2026-55833</cve>
+    <cve>CVE-2026-55831</cve>
+    <cve>CVE-2026-33871</cve>
+    <cve>CVE-2026-33870</cve>
+    <cve>CVE-2026-42578</cve>
+    <cve>CVE-2026-42579</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      41 CVE id(s) against netty-resolver-dns-classes-macos-4.1.122.Final.jar, part of the Netty release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/io.netty/netty-resolver-dns-classes-macos@4.1.122.Final</packageUrl>
+    <cve>CVE-2026-44893</cve>
+    <cve>CVE-2026-44250</cve>
+    <cve>CVE-2026-48059</cve>
+    <cve>CVE-2026-44890</cve>
+    <cve>CVE-2026-44891</cve>
+    <cve>CVE-2026-50011</cve>
+    <cve>CVE-2026-59901</cve>
+    <cve>CVE-2026-42587</cve>
+    <cve>CVE-2026-42586</cve>
+    <cve>CVE-2026-44248</cve>
+    <cve>CVE-2025-58056</cve>
+    <cve>CVE-2026-44249</cve>
+    <cve>CVE-2025-58057</cve>
+    <cve>CVE-2026-45416</cve>
+    <cve>CVE-2026-45674</cve>
+    <cve>CVE-2026-56745</cve>
+    <cve>CVE-2026-56822</cve>
+    <cve>CVE-2026-56821</cve>
+    <cve>CVE-2026-47691</cve>
+    <cve>CVE-2026-56820</cve>
+    <cve>CVE-2026-50010</cve>
+    <cve>CVE-2026-56819</cve>
+    <cve>CVE-2026-56817</cve>
+    <cve>CVE-2026-62380</cve>
+    <cve>CVE-2026-59898</cve>
+    <cve>CVE-2026-59899</cve>
+    <cve>CVE-2026-55851</cve>
+    <cve>CVE-2025-55163</cve>
+    <cve>CVE-2026-42581</cve>
+    <cve>CVE-2026-48006</cve>
+    <cve>CVE-2026-42585</cve>
+    <cve>CVE-2026-42584</cve>
+    <cve>CVE-2026-46340</cve>
+    <cve>CVE-2026-42583</cve>
+    <cve>CVE-2026-48043</cve>
+    <cve>CVE-2026-55833</cve>
+    <cve>CVE-2026-55831</cve>
+    <cve>CVE-2026-33871</cve>
+    <cve>CVE-2026-33870</cve>
+    <cve>CVE-2026-42578</cve>
+    <cve>CVE-2026-42579</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      41 CVE id(s) against netty-transport-4.1.122.Final.jar, part of the Netty release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
     ]]></notes>
     <packageUrl>pkg:maven/io.netty/netty-transport@4.1.122.Final</packageUrl>
     <cve>CVE-2026-44893</cve>
@@ -301,156 +1449,116 @@
     <cve>CVE-2026-42579</cve>
   </suppress>
 
-  <!-- postgresql-42.7.7.jar -->
   <suppress until="2026-12-04Z">
     <notes><![CDATA[
-      CVE-2026-42198 against postgresql-42.7.7.jar.
-      No newer release of this artifact exists in the public registry as of
-      2026-09-05 that addresses this advisory. review-by: 2026-12-04
+      41 CVE id(s) against netty-transport-classes-epoll-4.1.122.Final.jar, part of the Netty release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
     ]]></notes>
-    <packageUrl>pkg:maven/org.postgresql/postgresql@42.7.7</packageUrl>
-    <cve>CVE-2026-42198</cve>
+    <packageUrl>pkg:maven/io.netty/netty-transport-classes-epoll@4.1.122.Final</packageUrl>
+    <cve>CVE-2026-44893</cve>
+    <cve>CVE-2026-44250</cve>
+    <cve>CVE-2026-48059</cve>
+    <cve>CVE-2026-44890</cve>
+    <cve>CVE-2026-44891</cve>
+    <cve>CVE-2026-50011</cve>
+    <cve>CVE-2026-59901</cve>
+    <cve>CVE-2026-42587</cve>
+    <cve>CVE-2026-42586</cve>
+    <cve>CVE-2026-44248</cve>
+    <cve>CVE-2025-58056</cve>
+    <cve>CVE-2026-44249</cve>
+    <cve>CVE-2025-58057</cve>
+    <cve>CVE-2026-45416</cve>
+    <cve>CVE-2026-45674</cve>
+    <cve>CVE-2026-56745</cve>
+    <cve>CVE-2026-56822</cve>
+    <cve>CVE-2026-56821</cve>
+    <cve>CVE-2026-47691</cve>
+    <cve>CVE-2026-56820</cve>
+    <cve>CVE-2026-50010</cve>
+    <cve>CVE-2026-56819</cve>
+    <cve>CVE-2026-56817</cve>
+    <cve>CVE-2026-62380</cve>
+    <cve>CVE-2026-59898</cve>
+    <cve>CVE-2026-59899</cve>
+    <cve>CVE-2026-55851</cve>
+    <cve>CVE-2025-55163</cve>
+    <cve>CVE-2026-42581</cve>
+    <cve>CVE-2026-48006</cve>
+    <cve>CVE-2026-42585</cve>
+    <cve>CVE-2026-42584</cve>
+    <cve>CVE-2026-46340</cve>
+    <cve>CVE-2026-42583</cve>
+    <cve>CVE-2026-48043</cve>
+    <cve>CVE-2026-55833</cve>
+    <cve>CVE-2026-55831</cve>
+    <cve>CVE-2026-33871</cve>
+    <cve>CVE-2026-33870</cve>
+    <cve>CVE-2026-42578</cve>
+    <cve>CVE-2026-42579</cve>
   </suppress>
 
-  <!-- spring-boot-3.3.13.jar / spring-boot-starter-data-jpa / spring-boot-starter-web (same 5 CVEs, share the Spring Boot release train) -->
   <suppress until="2026-12-04Z">
     <notes><![CDATA[
-      5 CVE ids against spring-boot-3.3.13.jar (CVE-2026-40972, CVE-2026-40975,
-      CVE-2026-22733, CVE-2026-40973, CVE-2026-40974). spring-boot-starter-parent
-      was bumped 3.3.6 -> 3.3.13 (the latest published 3.3.x release) as part of
-      this fix; these CVEs were disclosed after 3.3.13's real release date and
-      have no fix in any published 3.3.x version. A Spring Boot 3.4.x/3.5.x
-      minor-version migration may resolve them and is tracked as a separate,
-      unverified follow-up. review-by: 2026-12-04
+      41 CVE id(s) against netty-transport-native-unix-common-4.1.122.Final.jar, part of the Netty release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
     ]]></notes>
-    <packageUrl>pkg:maven/org.springframework.boot/spring-boot@3.3.13</packageUrl>
-    <cve>CVE-2026-40972</cve>
-    <cve>CVE-2026-40975</cve>
-    <cve>CVE-2026-22733</cve>
-    <cve>CVE-2026-40973</cve>
-    <cve>CVE-2026-40974</cve>
-  </suppress>
-  <suppress until="2026-12-04Z">
-    <notes><![CDATA[
-      Same 5 CVEs as spring-boot-3.3.13.jar (transitively via
-      spring-boot-starter-data-jpa) - see that entry's notes. review-by: 2026-12-04
-    ]]></notes>
-    <packageUrl>pkg:maven/org.springframework.boot/spring-boot-starter-data-jpa@3.3.13</packageUrl>
-    <cve>CVE-2026-40972</cve>
-    <cve>CVE-2026-40975</cve>
-    <cve>CVE-2026-22733</cve>
-    <cve>CVE-2026-40973</cve>
-    <cve>CVE-2026-40974</cve>
-  </suppress>
-  <suppress until="2026-12-04Z">
-    <notes><![CDATA[
-      Same 5 CVEs as spring-boot-3.3.13.jar (transitively via
-      spring-boot-starter-web) - see that entry's notes. review-by: 2026-12-04
-    ]]></notes>
-    <packageUrl>pkg:maven/org.springframework.boot/spring-boot-starter-web@3.3.13</packageUrl>
-    <cve>CVE-2026-40972</cve>
-    <cve>CVE-2026-40975</cve>
-    <cve>CVE-2026-22733</cve>
-    <cve>CVE-2026-40973</cve>
-    <cve>CVE-2026-40974</cve>
-  </suppress>
-
-  <!-- spring-core-6.1.21.jar / spring-web-6.1.21.jar (same Spring Framework release train, same 12 CVEs) -->
-  <suppress until="2026-12-04Z">
-    <notes><![CDATA[
-      12 CVE ids against spring-core-6.1.21.jar (CVE-2026-41838, CVE-2026-59313,
-      CVE-2026-41851, CVE-2026-41850, CVE-2026-41855, CVE-2026-47892,
-      CVE-2026-47891, CVE-2026-47893, CVE-2026-41848, CVE-2026-59283,
-      CVE-2026-41842, CVE-2026-59282). spring-core moved to 6.1.21 as a
-      transitive of the spring-boot-starter-parent 3.3.13 bump; these CVEs
-      were disclosed after 6.1.21's real release date and have no fix in any
-      published 6.1.x version. review-by: 2026-12-04
-    ]]></notes>
-    <packageUrl>pkg:maven/org.springframework/spring-core@6.1.21</packageUrl>
-    <cve>CVE-2026-41838</cve>
-    <cve>CVE-2026-59313</cve>
-    <cve>CVE-2026-41851</cve>
-    <cve>CVE-2026-41850</cve>
-    <cve>CVE-2026-41855</cve>
-    <cve>CVE-2026-47892</cve>
-    <cve>CVE-2026-47891</cve>
-    <cve>CVE-2026-47893</cve>
-    <cve>CVE-2026-41848</cve>
-    <cve>CVE-2026-59283</cve>
-    <cve>CVE-2026-41842</cve>
-    <cve>CVE-2026-59282</cve>
-  </suppress>
-  <suppress until="2026-12-04Z">
-    <notes><![CDATA[
-      Same 12 CVEs as spring-core-6.1.21.jar (spring-web shares the Spring
-      Framework release train) - see that entry's notes. review-by: 2026-12-04
-    ]]></notes>
-    <packageUrl>pkg:maven/org.springframework/spring-web@6.1.21</packageUrl>
-    <cve>CVE-2026-41838</cve>
-    <cve>CVE-2026-59313</cve>
-    <cve>CVE-2026-41851</cve>
-    <cve>CVE-2026-41850</cve>
-    <cve>CVE-2026-41855</cve>
-    <cve>CVE-2026-47892</cve>
-    <cve>CVE-2026-47891</cve>
-    <cve>CVE-2026-47893</cve>
-    <cve>CVE-2026-41848</cve>
-    <cve>CVE-2026-59283</cve>
-    <cve>CVE-2026-41842</cve>
-    <cve>CVE-2026-59282</cve>
+    <packageUrl>pkg:maven/io.netty/netty-transport-native-unix-common@4.1.122.Final</packageUrl>
+    <cve>CVE-2026-44893</cve>
+    <cve>CVE-2026-44250</cve>
+    <cve>CVE-2026-48059</cve>
+    <cve>CVE-2026-44890</cve>
+    <cve>CVE-2026-44891</cve>
+    <cve>CVE-2026-50011</cve>
+    <cve>CVE-2026-59901</cve>
+    <cve>CVE-2026-42587</cve>
+    <cve>CVE-2026-42586</cve>
+    <cve>CVE-2026-44248</cve>
+    <cve>CVE-2025-58056</cve>
+    <cve>CVE-2026-44249</cve>
+    <cve>CVE-2025-58057</cve>
+    <cve>CVE-2026-45416</cve>
+    <cve>CVE-2026-45674</cve>
+    <cve>CVE-2026-56745</cve>
+    <cve>CVE-2026-56822</cve>
+    <cve>CVE-2026-56821</cve>
+    <cve>CVE-2026-47691</cve>
+    <cve>CVE-2026-56820</cve>
+    <cve>CVE-2026-50010</cve>
+    <cve>CVE-2026-56819</cve>
+    <cve>CVE-2026-56817</cve>
+    <cve>CVE-2026-62380</cve>
+    <cve>CVE-2026-59898</cve>
+    <cve>CVE-2026-59899</cve>
+    <cve>CVE-2026-55851</cve>
+    <cve>CVE-2025-55163</cve>
+    <cve>CVE-2026-42581</cve>
+    <cve>CVE-2026-48006</cve>
+    <cve>CVE-2026-42585</cve>
+    <cve>CVE-2026-42584</cve>
+    <cve>CVE-2026-46340</cve>
+    <cve>CVE-2026-42583</cve>
+    <cve>CVE-2026-48043</cve>
+    <cve>CVE-2026-55833</cve>
+    <cve>CVE-2026-55831</cve>
+    <cve>CVE-2026-33871</cve>
+    <cve>CVE-2026-33870</cve>
+    <cve>CVE-2026-42578</cve>
+    <cve>CVE-2026-42579</cve>
   </suppress>
 
-  <!-- spring-security-core / spring-security-web 6.3.10.jar (same 3 CVEs) -->
-  <suppress until="2026-12-04Z">
-    <notes><![CDATA[
-      3 CVE ids against spring-security-core-6.3.10.jar (CVE-2026-40988,
-      CVE-2026-47838, CVE-2026-22732). No newer release of this artifact
-      exists in the public registry as of 2026-09-05 that addresses these
-      advisories. review-by: 2026-12-04
-    ]]></notes>
-    <packageUrl>pkg:maven/org.springframework.security/spring-security-core@6.3.10</packageUrl>
-    <cve>CVE-2026-40988</cve>
-    <cve>CVE-2026-47838</cve>
-    <cve>CVE-2026-22732</cve>
-  </suppress>
-  <suppress until="2026-12-04Z">
-    <notes><![CDATA[
-      Same 3 CVEs as spring-security-core-6.3.10.jar - see that entry's notes.
-      review-by: 2026-12-04
-    ]]></notes>
-    <packageUrl>pkg:maven/org.springframework.security/spring-security-web@6.3.10</packageUrl>
-    <cve>CVE-2026-40988</cve>
-    <cve>CVE-2026-47838</cve>
-    <cve>CVE-2026-22732</cve>
-  </suppress>
+  <!-- ===== Tomcat Embed @ 10.1.42 — 31 CVE id(s) per artifact ===== -->
 
-  <!-- swagger-ui-5.13.0.jar (bundled DOMPurify 3.0.11) -->
   <suppress until="2026-12-04Z">
     <notes><![CDATA[
-      CVE-2026-65898 against the DOMPurify 3.0.11 bundle inside
-      swagger-ui-5.13.0.jar (springdoc-openapi's bundled swagger-ui asset).
-      No newer release of this artifact exists in the public npm registry as
-      of 2026-09-05 that addresses this advisory. review-by: 2026-12-04
-    ]]></notes>
-    <packageUrl>pkg:javascript/DOMPurify@3.0.11</packageUrl>
-    <cve>CVE-2026-65898</cve>
-  </suppress>
-
-  <!-- tomcat-embed-core-10.1.42.jar -->
-  <suppress until="2026-12-04Z">
-    <notes><![CDATA[
-      30 CVE ids against tomcat-embed-core-10.1.42.jar (CVE-2025-52520,
-      CVE-2025-55754, CVE-2026-66422, CVE-2026-41284, CVE-2026-68763,
-      CVE-2026-53404, CVE-2026-65905, CVE-2026-65927, CVE-2026-29145,
-      CVE-2026-29146, CVE-2026-55276, CVE-2026-43513, CVE-2026-43512,
-      CVE-2026-43515, CVE-2026-65183, CVE-2026-24734, CVE-2026-41293,
-      CVE-2025-53506, CVE-2026-53434, CVE-2026-65182, CVE-2025-66614,
-      CVE-2026-34487, CVE-2026-34483, CVE-2025-48989, CVE-2026-24880,
-      CVE-2025-55752, CVE-2026-42498, CVE-2026-68525, CVE-2026-68569,
-      CVE-2026-59083, CVE-2026-59084). tomcat-embed-core moved to 10.1.42 as
-      a transitive of the spring-boot-starter-parent 3.3.13 bump; these CVEs
-      were disclosed after 10.1.42's real release date and have no fix in
-      any published 10.1.x version. review-by: 2026-12-04
+      31 CVE id(s) against tomcat-embed-core-10.1.42.jar, part of the Tomcat Embed release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
     ]]></notes>
     <packageUrl>pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@10.1.42</packageUrl>
     <cve>CVE-2025-52520</cve>
@@ -484,6 +1592,205 @@
     <cve>CVE-2026-68569</cve>
     <cve>CVE-2026-59083</cve>
     <cve>CVE-2026-59084</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      31 CVE id(s) against tomcat-embed-el-10.1.42.jar, part of the Tomcat Embed release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.apache.tomcat.embed/tomcat-embed-el@10.1.42</packageUrl>
+    <cve>CVE-2025-52520</cve>
+    <cve>CVE-2025-55754</cve>
+    <cve>CVE-2026-66422</cve>
+    <cve>CVE-2026-41284</cve>
+    <cve>CVE-2026-68763</cve>
+    <cve>CVE-2026-53404</cve>
+    <cve>CVE-2026-65905</cve>
+    <cve>CVE-2026-65927</cve>
+    <cve>CVE-2026-29145</cve>
+    <cve>CVE-2026-29146</cve>
+    <cve>CVE-2026-55276</cve>
+    <cve>CVE-2026-43513</cve>
+    <cve>CVE-2026-43512</cve>
+    <cve>CVE-2026-43515</cve>
+    <cve>CVE-2026-65183</cve>
+    <cve>CVE-2026-24734</cve>
+    <cve>CVE-2026-41293</cve>
+    <cve>CVE-2025-53506</cve>
+    <cve>CVE-2026-53434</cve>
+    <cve>CVE-2026-65182</cve>
+    <cve>CVE-2025-66614</cve>
+    <cve>CVE-2026-34487</cve>
+    <cve>CVE-2026-34483</cve>
+    <cve>CVE-2025-48989</cve>
+    <cve>CVE-2026-24880</cve>
+    <cve>CVE-2025-55752</cve>
+    <cve>CVE-2026-42498</cve>
+    <cve>CVE-2026-68525</cve>
+    <cve>CVE-2026-68569</cve>
+    <cve>CVE-2026-59083</cve>
+    <cve>CVE-2026-59084</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      31 CVE id(s) against tomcat-embed-websocket-10.1.42.jar, part of the Tomcat Embed release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.apache.tomcat.embed/tomcat-embed-websocket@10.1.42</packageUrl>
+    <cve>CVE-2025-52520</cve>
+    <cve>CVE-2025-55754</cve>
+    <cve>CVE-2026-66422</cve>
+    <cve>CVE-2026-41284</cve>
+    <cve>CVE-2026-68763</cve>
+    <cve>CVE-2026-53404</cve>
+    <cve>CVE-2026-65905</cve>
+    <cve>CVE-2026-65927</cve>
+    <cve>CVE-2026-29145</cve>
+    <cve>CVE-2026-29146</cve>
+    <cve>CVE-2026-55276</cve>
+    <cve>CVE-2026-43513</cve>
+    <cve>CVE-2026-43512</cve>
+    <cve>CVE-2026-43515</cve>
+    <cve>CVE-2026-65183</cve>
+    <cve>CVE-2026-24734</cve>
+    <cve>CVE-2026-41293</cve>
+    <cve>CVE-2025-53506</cve>
+    <cve>CVE-2026-53434</cve>
+    <cve>CVE-2026-65182</cve>
+    <cve>CVE-2025-66614</cve>
+    <cve>CVE-2026-34487</cve>
+    <cve>CVE-2026-34483</cve>
+    <cve>CVE-2025-48989</cve>
+    <cve>CVE-2026-24880</cve>
+    <cve>CVE-2025-55752</cve>
+    <cve>CVE-2026-42498</cve>
+    <cve>CVE-2026-68525</cve>
+    <cve>CVE-2026-68569</cve>
+    <cve>CVE-2026-59083</cve>
+    <cve>CVE-2026-59084</cve>
+  </suppress>
+
+  <!-- ===== Kotlin stdlib @ 1.9.25 — 1 CVE id(s) per artifact ===== -->
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      1 CVE id(s) against kotlin-stdlib-1.9.25.jar, part of the Kotlin stdlib release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@1.9.25</packageUrl>
+    <cve>CVE-2026-53914</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      1 CVE id(s) against kotlin-stdlib-common-1.9.25.jar, part of the Kotlin stdlib release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.jetbrains.kotlin/kotlin-stdlib-common@1.9.25</packageUrl>
+    <cve>CVE-2026-53914</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      1 CVE id(s) against kotlin-stdlib-jdk7-1.9.25.jar, part of the Kotlin stdlib release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.jetbrains.kotlin/kotlin-stdlib-jdk7@1.9.25</packageUrl>
+    <cve>CVE-2026-53914</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      1 CVE id(s) against kotlin-stdlib-jdk8-1.9.25.jar, part of the Kotlin stdlib release train.
+      This artifact is already at the newest version published in the public
+      Maven Central index as of 2026-09-05; every id below was disclosed after
+      that release, so no dependency bump resolves it today. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.jetbrains.kotlin/kotlin-stdlib-jdk8@1.9.25</packageUrl>
+    <cve>CVE-2026-53914</cve>
+  </suppress>
+
+  <!-- ===== standalone artifacts ===== -->
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      angus-activation-2.0.2.jar. Already at the newest version published in the public registry as
+      of 2026-09-05; the advisory postdates that release. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.eclipse.angus/angus-activation@2.0.2</packageUrl>
+    <cve>CVE-2025-7962</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      jackson-databind-2.17.3.jar. Already at the newest version published in the public registry as
+      of 2026-09-05; the advisory postdates that release. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.17.3</packageUrl>
+    <cve>CVE-2026-54512</cve>
+    <cve>CVE-2026-54513</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      kafka-clients-3.7.2.jar. Already at the newest version published in the public registry as
+      of 2026-09-05; the advisory postdates that release. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.apache.kafka/kafka-clients@3.7.2</packageUrl>
+    <cve>CVE-2026-35554</cve>
+    <cve>CVE-2025-27817</cve>
+    <cve>CVE-2025-27818</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      log4j-api-2.23.1.jar. Already at the newest version published in the public registry as
+      of 2026-09-05; the advisory postdates that release. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.apache.logging.log4j/log4j-api@2.23.1</packageUrl>
+    <cve>CVE-2026-34478</cve>
+    <cve>CVE-2026-34479</cve>
+    <cve>CVE-2026-34480</cve>
+    <cve>CVE-2026-34481</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      micrometer-registry-prometheus-1.13.15.jar. Already at the newest version published in the public registry as
+      of 2026-09-05; the advisory postdates that release. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/io.micrometer/micrometer-registry-prometheus@1.13.15</packageUrl>
+    <cve>CVE-2026-42154</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      postgresql-42.7.7.jar. Already at the newest version published in the public registry as
+      of 2026-09-05; the advisory postdates that release. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:maven/org.postgresql/postgresql@42.7.7</packageUrl>
+    <cve>CVE-2026-42198</cve>
+  </suppress>
+
+  <suppress until="2026-12-04Z">
+    <notes><![CDATA[
+      DOMPurify 3.0.11 bundled inside swagger-ui-5.13.0.jar (springdoc asset). Already at the newest version published in the public registry as
+      of 2026-09-05; the advisory postdates that release. review-by: 2026-12-04
+    ]]></notes>
+    <packageUrl>pkg:javascript/DOMPurify@3.0.11</packageUrl>
+    <cve>CVE-2026-65898</cve>
   </suppress>
 
 </suppressions>
