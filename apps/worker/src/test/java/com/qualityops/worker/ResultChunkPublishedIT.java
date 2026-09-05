@@ -1,5 +1,6 @@
 package com.qualityops.worker;
 
+import com.qualityops.events.RunCompletedEvent;
 import com.qualityops.events.RunRequestedEvent;
 import com.qualityops.events.TestCaseSnapshotItem;
 import com.qualityops.worker.support.AbstractWorkerKafkaPostgresIT;
@@ -94,7 +95,7 @@ class ResultChunkPublishedIT extends AbstractWorkerKafkaPostgresIT {
             c -> c.contains("\"testCaseId\":\"" + item.testCaseId() + "\""))).isTrue());
 
         var terminal = values(seen, COMPLETED, runId).get(0);
-        assertThat(terminal).contains("\"schemaVersion\":4");
+        assertThat(terminal).contains("\"schemaVersion\":" + RunCompletedEvent.SCHEMA_VERSION);
         assertThat(terminal).contains("\"attemptEpoch\":0");
         assertThat(terminal).contains("\"artifacts\":[]");
     }
